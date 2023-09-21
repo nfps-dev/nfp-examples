@@ -1,14 +1,21 @@
 <script lang="ts">
+	import Wallet from '@nfps.dev/components/src/Wallet.svelte';
 	import {qs, qsa} from '@nfps.dev/runtime';
 	
 	// use import statements for any modules that are already loaded by the time 'app' starts loading
 	import {
+		K_CONTRACT,
+		SH_VIEWING_KEY,
 		ls_read,
 		ls_write,
 	} from 'nfpx:bootloader';
-	
-	import Notifications from './Notifications.svelte';
-	import Wallet from './Wallet.svelte';
+
+	const {
+		K_WALLET,
+		SA_OWNER,
+		A_COMCS,
+		dm_foreign,
+	} = destructureImportedNfpModule('app');
 
 	// before 'App.svelte' is instantiated, 'main.ts' dynamically loads the 'storage' module.
 	// use an reserved function to import from the loaded module rather than a static import.
@@ -17,65 +24,6 @@
 		readOwner,
 		writeOwner,
 	} = destructureImportedNfpModule('storage');
-
-	// disable parts of the UI while loading results
-	let b_loading = true;
-
-	// lock the name if it is saved to chain
-	let b_locked = false;
-
-	// load existing data from localStorage cacheSain
-	let s_name = ls_read('name') || '';
-
-	const S_ACTION_SAVE = 'Save to chain';
-	const S_ACTION_EDIT = 'Edit';
-
-	let dm_section: HTMLElement;
-
-	const S_PLACEHOLDER_LOADING = 'Loading...';
-	const S_PLACEHOLDER_READY = 'Name your token';
-	let s_placeholder = S_PLACEHOLDER_LOADING;
-
-	let s_action = S_ACTION_EDIT;
-	async function edit_name() {
-		if(s_action === S_ACTION_EDIT) {
-			b_locked = false;
-			qs(dm_section, '#name')!.focus();
-		}
-		else {
-			b_loading = true;
-
-			qsa(dm_section, 'input,button')
-				.map(dm => dm.setAttribute('disabled', 'disabled'));
-
-			// save to cache
-			ls_write('name', s_name || '');
-
-			s_action = 'Saving...';
-
-			await writeOwner({
-				name: s_name,
-			});
-
-			s_action = S_ACTION_EDIT;
-
-			// 
-			b_loading = false;
-		}
-	}
-
-	let b_writable = false;
-
-	// load saved value
-	(async() => {
-		// load name from the chain and lock/unlock the input depending on whether a name exists
-		if(!(b_locked=!!(s_name=(await readOwner(['name']))?.name || ''))) {
-			s_placeholder = S_PLACEHOLDER_READY;
-			s_action = S_ACTION_SAVE;
-		}
-
-		b_loading = false;
-	})();
 
 </script>
 
@@ -162,4 +110,6 @@
 	<!-- <Notifications /> -->
 </section>
 
-<Wallet bind:b_writable />
+<Wallet
+	args={[K_WALLET, SA_OWNER, [SH_VIEWING_KEY, SA_OWNER], A_COMCS, K_CONTRACT, dm_foreign]}
+	/>

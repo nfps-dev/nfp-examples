@@ -41,7 +41,7 @@ If a module has not yet been loaded into the SVG document but the script depends
 
 ## Dynamic Imports
 
-To load a module into the app from a script, the module's source code needs to be downloaded from the chain and appended to the document as a `<script>` element. This retrieval happens by querying the NFP's smart contract for the corresponding package file.
+To load a module into the app from a script, the module's source code needs to be downloaded from the chain and appended to the document as a `<script>` element. Under the hood, this retrieval happens by querying the NFP's smart contract for the corresponding package file.
 
 ```ts
 /* applibs/src/baz/main.ts */

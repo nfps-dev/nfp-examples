@@ -14,7 +14,9 @@
 			"nfpx:*?tag=latest": ["./dist/*.d.ts"],
 			"nfpx:*?tag=1.x": ["./dist/*.d.ts"],
 			"nfpx:*": ["./dist/*.d.ts"],
-		}
+		},
+
+		"moduleResolution": "Bundler"
 	},
 
 	"include": [
@@ -23,6 +25,7 @@
 		"app/**/*.svelte",
 		"bootloader/**/*.ts",
 		"applibs/**/*.ts",
+		"contract/**/*.ts",
 		"test/**/*.ts",
 		"*.ts",
 		".eslintrc.cjs"
