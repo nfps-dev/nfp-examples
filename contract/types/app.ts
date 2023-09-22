@@ -127,6 +127,8 @@ export type App = SecretContractInterface<{
 		 */
 		attack_cell: [{
 			cell: Uint8;
+		}, {
+			result: CellValue;
 		}];
 
 		/**

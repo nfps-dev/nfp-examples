@@ -110,7 +110,7 @@ pub enum ExecuteAnswer {
     }
     
     AttackCell {
-        status: ResponseStatus,
+        result: CellValue,
     }
     
     ClaimVictory {
