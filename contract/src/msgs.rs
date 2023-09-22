@@ -2,6 +2,7 @@ use cosmwasm_std::{Coin, Timestamp};
 
 /// Distinguishes to a player which role they fulfil
 #[derive(Debug)]
+#[repr(u8)]
 pub enum PlayerRole {
     /// this player initiated the game
     Initiator = 0,
@@ -11,6 +12,7 @@ pub enum PlayerRole {
 
 /// Describes the state of an initiated game (fits into u8)
 #[derive(Debug)]
+#[repr(u8)]
 pub enum GameState {
     /// waiting for another player to join
     WaitingForPlayer = 0,
@@ -32,6 +34,7 @@ pub enum GameState {
 
 /// Describes the occupancy of a cell (fits into u8)
 #[derive(Debug)]
+#[repr(u8)]
 pub enum CellValue {
     /// part of the "Carrier" vessel occupies the cell
     Carrier = 0,
@@ -102,11 +105,11 @@ pub enum ExecuteAnswer {
     },
     
     JoinGame {
-        status: ResponseStatus,
+        
     },
     
     SubmitSetup {
-        status: ResponseStatus,
+        
     },
     
     AttackCell {
@@ -114,9 +117,10 @@ pub enum ExecuteAnswer {
     },
     
     ClaimVictory {
-        status: ResponseStatus,
+        
     },
 }
+
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {

@@ -1,7 +1,14 @@
 import type {Coin, Timestamp, Uint32, Uint8} from '@solar-republic/contractor/datatypes';
-import type {SecretContractInterface} from '@solar-republic/contractor/snips';
+import type {SecretContractInterface, Snip721} from '@solar-republic/contractor/snips';
 import type {MethodDescriptorGroup, MethodGroup, Execution} from '@solar-republic/contractor/typings';
 
+import {AccessLevel} from '@solar-republic/contractor/snip-721';
+
+// export type * from '@solar-republic/contractor/snip-721';
+
+// export * from '@solar-republic/contractor/snip-721';
+
+export {AccessLevel};
 
 type WagerAmountsScrt = '1' | '2' | '5' | '10';
 
@@ -95,6 +102,8 @@ type MsgsRequiresGameId<h_group extends MethodDescriptorGroup> = MethodGroup.Aug
 }>;
 
 export type App = SecretContractInterface<{
+	// extends: [Snip721];
+
 	executions: {
 		/**
 		 * Creates a new game in the lobby
