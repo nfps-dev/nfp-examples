@@ -1,4 +1,13 @@
+use serde::{Deserialize, Serialize};
+use schemars::{JsonSchema};
 use cosmwasm_std::{Coin, Timestamp};
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum ResponseStatus {
+    Success,
+    Failure,
+}
 
 /// Distinguishes to a player which role they fulfil
 #[derive(Debug)]
@@ -105,11 +114,11 @@ pub enum ExecuteAnswer {
     },
     
     JoinGame {
-        
+        status: ResponseStatus,
     },
     
     SubmitSetup {
-        
+        status: ResponseStatus,
     },
     
     AttackCell {
@@ -117,7 +126,7 @@ pub enum ExecuteAnswer {
     },
     
     ClaimVictory {
-        
+        status: ResponseStatus,
     },
 }
 
