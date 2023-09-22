@@ -67,30 +67,30 @@ pub enum ExecuteMsg {
     NewGame {
         padding: Option<String>,
         title: Option<String>,
-    }
+    },
     
     JoinGame {
         padding: Option<String>,
         game_id: String,
-    }
+    },
     
     SubmitSetup {
         padding: Option<String>,
         game_id: String,
         ready: Option<bool /* boolean | undefined */>,
         cells: Vec<CellValue>,
-    }
+    },
     
     AttackCell {
         padding: Option<String>,
         game_id: String,
         cell: u8,
-    }
+    },
     
     ClaimVictory {
         padding: Option<String>,
         game_id: String,
-    }
+    },
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
@@ -99,23 +99,23 @@ pub enum ExecuteAnswer {
     
     NewGame {
         game: NewGame,
-    }
+    },
     
     JoinGame {
         status: ResponseStatus,
-    }
+    },
     
     SubmitSetup {
         status: ResponseStatus,
-    }
+    },
     
     AttackCell {
         result: CellValue,
-    }
+    },
     
     ClaimVictory {
         status: ResponseStatus,
-    }
+    },
 }
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -124,11 +124,11 @@ pub enum QueryMsg {
     ListGames {
         page_size: Option<u32>,
         page: Option<u32>,
-    }
+    },
     
     GameState {
         game_id: String,
-    }
+    },
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
@@ -137,12 +137,12 @@ pub enum QueryAnswer {
     
     ListGames {
         games: Vec<NewGame>,
-    }
+    },
     
     GameState {
         role: PlayerRole,
         state: GameState,
         tracking: Vec<CellValue>,
         board: Vec<CellValue>,
-    }
+    },
 }
