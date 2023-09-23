@@ -1,6 +1,6 @@
-import type {Coin, Timestamp, Uint32, Uint8} from '@solar-republic/contractor/datatypes';
+import type {Coin, Timestamp, Uint128, Uint32, Uint8} from '@solar-republic/contractor/datatypes';
 import type {SecretContractInterface, Snip721} from '@solar-republic/contractor/snips';
-import type {MethodDescriptorGroup, MethodGroup, Execution} from '@solar-republic/contractor/typings';
+import type {MethodDescriptorGroup, MethodGroup, Execution, SentFunds} from '@solar-republic/contractor/typings';
 
 import {AccessLevel} from '@solar-republic/contractor/snip-721';
 
@@ -22,6 +22,7 @@ export enum PlayerRole {
 	// this player joined the game
 	JOINER,
 }
+
 
 /**
  * Describes the state of an initiated game (fits into u8)
@@ -85,7 +86,6 @@ export enum CellValue {
 
 /**
  * Used to represent a game to prospective players browsing the lobby
- * @derive Serialize, Deserialize, JsonSchema
  */
 export type NewGame = {
 	game_id: string;
@@ -108,14 +108,18 @@ export type App = SecretContractInterface<{
 		/**
 		 * Creates a new game in the lobby
 		 */
-		new_game: Execution.RequireSentFunds<[{
-			title?: string;
-		}, {
-			game: NewGame;
-		}], {
-			amount: '0' | `${WagerAmountsScrt}000000`;
-			denom: 'uscrt';
-		}>;
+		new_game: {
+			call: {
+				title?: string;
+			};
+			response: {
+				game: NewGame;
+			};
+			funds: {
+				amount: Uint128<'0' | `${WagerAmountsScrt}000000`>;
+				denom: 'uscrt';
+			};
+		};
 	}
 	& MsgsRequiresGameId<{
 		/**
@@ -169,3 +173,12 @@ export type App = SecretContractInterface<{
 		}];
 	}>;
 }>;
+
+type def = App['config']['default_execution_answer'];
+type wtf = App['executions']['join_game']['merged']['response'];
+
+// type deb = App['executions']['join_game']
+type deb = App['executions']['join_game']['variants'];
+
+
+type insp = App['executions']['new_game']['variants'][0]['funds']['amount'];

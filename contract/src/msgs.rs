@@ -1,17 +1,8 @@
 use serde::{Deserialize, Serialize};
-use schemars::{JsonSchema};
 use cosmwasm_std::{Coin, Timestamp};
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum ResponseStatus {
-    Success,
-    Failure,
-}
-
 /// Distinguishes to a player which role they fulfil
-#[derive(Debug)]
-#[repr(u8)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum PlayerRole {
     /// this player initiated the game
     Initiator = 0,
@@ -20,8 +11,7 @@ pub enum PlayerRole {
 }
 
 /// Describes the state of an initiated game (fits into u8)
-#[derive(Debug)]
-#[repr(u8)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum GameState {
     /// waiting for another player to join
     WaitingForPlayer = 0,
@@ -42,8 +32,7 @@ pub enum GameState {
 }
 
 /// Describes the occupancy of a cell (fits into u8)
-#[derive(Debug)]
-#[repr(u8)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum CellValue {
     /// part of the "Carrier" vessel occupies the cell
     Carrier = 0,
@@ -64,7 +53,7 @@ pub enum CellValue {
 }
 
 /// Used to represent a game to prospective players browsing the lobby
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct NewGame {
     pub game_id: String,
     pub wager: Coin,
@@ -72,90 +61,103 @@ pub struct NewGame {
     pub created: Timestamp,
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     
+    /// Creates a new game in the lobby
     NewGame {
-        padding: Option<String>,
-        title: Option<String>,
+        pub padding: Option<String>,
     },
     
+    /// Joins a new game that is currently waiting for another player
     JoinGame {
-        padding: Option<String>,
-        game_id: String,
+        pub padding: Option<String>,
+        pub game_id: String,
     },
     
+    /// Player submits their board setup
     SubmitSetup {
-        padding: Option<String>,
-        game_id: String,
-        ready: Option<bool /* boolean | undefined */>,
-        cells: Vec<CellValue>,
+        pub padding: Option<String>,
+        pub game_id: String,
+        pub ready: Option<bool>,
+        pub cells: Vec<CellValue>,
     },
     
+    /// Player submits their move attacking an opponent's cell `w = x + (y * 10)` where w is in [0,99]
     AttackCell {
-        padding: Option<String>,
-        game_id: String,
-        cell: u8,
+        pub padding: Option<String>,
+        pub game_id: String,
+        pub cell: u8,
     },
     
+    /// Allows a player to claim victory once their opponent has exceeded their turn timer
     ClaimVictory {
-        padding: Option<String>,
-        game_id: String,
+        pub padding: Option<String>,
+        pub game_id: String,
     },
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteAnswer {
     
+    /// Creates a new game in the lobby
     NewGame {
-        game: NewGame,
+        pub game: NewGame,
     },
     
+    /// Joins a new game that is currently waiting for another player
     JoinGame {
-        status: ResponseStatus,
+        pub status: ResponseStatus,
     },
     
+    /// Player submits their board setup
     SubmitSetup {
-        status: ResponseStatus,
+        pub status: ResponseStatus,
     },
     
+    /// Player submits their move attacking an opponent's cell `w = x + (y * 10)` where w is in [0,99]
     AttackCell {
-        result: CellValue,
+        pub result: CellValue,
     },
     
+    /// Allows a player to claim victory once their opponent has exceeded their turn timer
     ClaimVictory {
-        status: ResponseStatus,
+        pub status: ResponseStatus,
     },
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     
+    /// Fetches a list of active games in the loby
     ListGames {
-        page_size: Option<u32>,
-        page: Option<u32>,
+        pub page_size: Option<u32>,
+        pub page: Option<u32>,
     },
     
+    /// Fetches the current game state
     GameState {
-        game_id: String,
+        pub game_id: String,
     },
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryAnswer {
     
+    /// Fetches a list of active games in the loby
     ListGames {
-        games: Vec<NewGame>,
+        pub games: Vec<NewGame>,
     },
     
+    /// Fetches the current game state
     GameState {
-        role: PlayerRole,
-        state: GameState,
-        tracking: Vec<CellValue>,
-        board: Vec<CellValue>,
+        pub role: PlayerRole,
+        pub state: GameState,
+        pub tracking: Vec<CellValue>,
+        pub board: Vec<CellValue>,
     },
 }
