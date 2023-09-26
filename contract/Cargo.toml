@@ -32,9 +32,6 @@ overflow-checks = true
 backtraces = ["cosmwasm-std/backtraces"]
 
 [dependencies]
-#cosmwasm-std = { git = "https://github.com/scrtlabs/cosmwasm", tag = "v1.1.9-secret" }
-#secret-toolkit = { git = "https://github.com/scrtlabs/secret-toolkit", rev = "0129d78f15461016ef64b1953ec4b505aacdcc78", default-features = false, features = ["storage", "serialization", "utils", "permit", "viewing-key", "crypto"] }
-#cosmwasm-storage = { git = "https://github.com/scrtlabs/cosmwasm", tag = "v1.1.9-secret" }
 cosmwasm-std = { package = "secret-cosmwasm-std", version = "1.1.10"  }
 cosmwasm-storage = { package = "secret-cosmwasm-storage", version = "1.1.10"  }
 secret-toolkit = { version = "0.9.0", default-features = false, features = ["storage", "serialization", "permit", "viewing-key"] }
@@ -46,6 +43,10 @@ bincode2 = "2.0.1"
 base64 = "0.21.0"
 primitive-types = { version = "0.12.1", default-features = false }
 cosmwasm-schema = { version = "1.2.2" }
+base32 = "0.4.0"
+rand_core = { version = "0.6.4", default-features = false }
+rand_chacha = { version = "0.3.1", default-features = false }
+sha2 = "0.10.6"
 
 # [dev-dependencies]
 # cosmwasm-schema = { version = "1.2.2" }
