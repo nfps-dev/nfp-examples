@@ -526,9 +526,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         // Battleship
         ExecuteMsg::NewGame { title, .. } => new_game(
             deps,
-            &info.sender,
+            env,
+            info,
             title,
-            env.block.time,
         ),
         ExecuteMsg::JoinGame { game_id, .. } => join_game(
             deps,
@@ -550,9 +550,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ),
         ExecuteMsg::ClaimVictory { game_id, .. } => claim_victory(
             deps,
+            env,
             &info.sender,
             game_id,
-        )
+        ),
     };
     pad_handle_result(response, BLOCK_SIZE)
 }
