@@ -522,6 +522,7 @@ pub enum ExecuteMsg {
     /// 
     /// Creates a new game in the lobby
     NewGame {
+        title: String,
         padding: Option<String>,
     },
     

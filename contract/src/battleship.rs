@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use schemars::JsonSchema;
-use cosmwasm_std::{Coin, Timestamp};
+use cosmwasm_std::{Coin, Timestamp, DepsMut, Addr, StdResult, Response, to_binary, Uint128, Deps, Binary};
+
+use crate::msg::{ExecuteAnswer, ResponseStatus, QueryAnswer};
 
 /// Distinguishes to a player which role they fulfil
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug, JsonSchema)]
@@ -60,4 +62,104 @@ pub struct NewGame {
     pub wager: Coin,
     pub title: String,
     pub created: Timestamp,
+}
+
+pub fn new_game(
+    deps: DepsMut,
+    sender: &Addr,
+    title: String,
+    created: Timestamp,
+) -> StdResult<Response> {
+    // ... TODO
+    let game = NewGame { 
+        game_id: "1".to_string(), 
+        wager: Coin { denom: "sscrt".to_string(), amount: Uint128::from(1_u128) }, 
+        title: "hello".to_string(), 
+        created 
+    };
+
+    Ok(
+        Response::new().set_data(to_binary(&ExecuteAnswer::NewGame {
+            game
+        })?),
+    )
+}
+
+pub fn join_game(
+    deps: DepsMut,
+    sender: &Addr,
+    game_id: String,
+) -> StdResult<Response> {
+    // ... TODO
+    Ok(
+        Response::new().set_data(to_binary(&ExecuteAnswer::JoinGame { 
+            status: ResponseStatus::Success 
+        })?)
+    )
+}
+
+pub fn submit_setup(
+    deps: DepsMut,
+    sender: &Addr,
+    game_id: String,
+    ready: Option<bool>,
+    cells: Vec<CellValue>,
+) -> StdResult<Response> {
+    // ... TODO
+    Ok(
+        Response::new().set_data(to_binary(&ExecuteAnswer::SubmitSetup { 
+            status: ResponseStatus::Success 
+        })?)
+    )
+}
+
+pub fn attack_cell(
+    deps: DepsMut,
+    sender: &Addr,
+    game_id: String,
+    cell: u8,
+) -> StdResult<Response> {
+    // ... TODO
+    let result = CellValue::Miss;
+    Ok(
+        Response::new().set_data(to_binary(&ExecuteAnswer::AttackCell { 
+            result 
+        })?)
+    )
+}
+
+pub fn claim_victory(
+    deps: DepsMut,
+    sender: &Addr,
+    game_id: String,
+) -> StdResult<Response> {
+    // ... TODO
+    Ok(
+        Response::new().set_data(to_binary(&ExecuteAnswer::ClaimVictory { 
+            status: ResponseStatus::Success 
+        })?)
+    )
+}
+
+pub fn query_list_games(
+    deps: Deps,
+    page: Option<u32>,
+    page_size: Option<u32>,
+) -> StdResult<Binary> {
+    // ... TODO
+    let games: Vec<NewGame> = vec![];
+    to_binary(&QueryAnswer::ListGames { games })
+}
+
+pub fn query_game_state(
+    deps: Deps,
+    game_id: String,
+) -> StdResult<Binary> {
+    // ... TODO
+    to_binary(&QueryAnswer::GameState { 
+        role: PlayerRole::Initiator, 
+        state: GameState::InitiatorsTurn, 
+        tracking: vec![], 
+        board: vec![] 
+    })
 }

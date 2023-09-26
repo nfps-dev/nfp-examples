@@ -1,5 +1,4 @@
-/// This contract implements SNIP-721 standard:
-/// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
+/// This contract implements SNIP-821 standard
 use std::collections::HashSet;
 use base64::{engine::general_purpose, Engine as _};
 use cosmwasm_std::{
@@ -15,7 +14,7 @@ use secret_toolkit::{
     viewing_key::{ViewingKey, ViewingKeyStore}, serialization::{Json, Serde}, 
 };
 
-use crate::expiration::Expiration;
+use crate::{expiration::Expiration, battleship::{new_game, join_game, submit_setup, attack_cell, claim_victory, query_list_games, query_game_state}};
 use crate::nfp::{
     add_any_delegate, add_token_delegate, remove_any_delegate, remove_token_delegate, remove_all_any_delegates, remove_all_token_delegates, 
     ANY_DELEGATES, TOKEN_DELEGATES, TOKEN_DELEGATES_INVERSE, ACCESS_PUBLIC_STRING, ACCESS_OWNERS_STRING, ACCESS_CLEARED_STRING, KEY_CLEARED_PACKAGES, 
@@ -523,6 +522,37 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             index,
             tags,
         ),
+
+        // Battleship
+        ExecuteMsg::NewGame { title, .. } => new_game(
+            deps,
+            &info.sender,
+            title,
+            env.block.time,
+        ),
+        ExecuteMsg::JoinGame { game_id, .. } => join_game(
+            deps,
+            &info.sender,
+            game_id,
+        ),
+        ExecuteMsg::SubmitSetup { game_id, ready, cells, .. } => submit_setup(
+            deps,
+            &info.sender,
+            game_id,
+            ready,
+            cells,
+        ),
+        ExecuteMsg::AttackCell { game_id, cell, .. } => attack_cell(
+            deps,
+            &info.sender,
+            game_id,
+            cell,
+        ),
+        ExecuteMsg::ClaimVictory { game_id, .. } => claim_victory(
+            deps,
+            &info.sender,
+            game_id,
+        )
     };
     pad_handle_result(response, BLOCK_SIZE)
 }
@@ -2342,7 +2372,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             }
             query_package_info(deps, package_id, page, page_size, viewer, None)
         }
-        QueryMsg::WithPermit { permit, query } => permit_queries(deps, &env, permit, query)
+        // Battleship
+        QueryMsg::ListGames { page_size, page } => query_list_games(deps, page, page_size),
+        QueryMsg::GameState { game_id } => query_game_state(deps, game_id),
+
+        QueryMsg::WithPermit { permit, query } => permit_queries(deps, &env, permit, query),
     };
     pad_query_result(response, BLOCK_SIZE)
 }
