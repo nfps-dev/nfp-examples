@@ -14,7 +14,7 @@ use secret_toolkit::{
     viewing_key::{ViewingKey, ViewingKeyStore}, serialization::{Json, Serde}, 
 };
 
-use crate::{expiration::Expiration, battleship::{new_game, join_game, submit_setup, attack_cell, claim_victory, query_list_games, query_game_state}};
+use crate::{expiration::Expiration, battleship::{join_game, submit_setup, attack_cell, claim_victory, query_list_games, query_game_state, listed_game}};
 use crate::nfp::{
     add_any_delegate, add_token_delegate, remove_any_delegate, remove_token_delegate, remove_all_any_delegates, remove_all_token_delegates, 
     ANY_DELEGATES, TOKEN_DELEGATES, TOKEN_DELEGATES_INVERSE, ACCESS_PUBLIC_STRING, ACCESS_OWNERS_STRING, ACCESS_CLEARED_STRING, KEY_CLEARED_PACKAGES, 
@@ -524,7 +524,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ),
 
         // Battleship
-        ExecuteMsg::NewGame { title, .. } => new_game(
+        ExecuteMsg::ListedGame { title, .. } => listed_game(
             deps,
             env,
             info,
@@ -535,11 +535,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             &info.sender,
             game_id,
         ),
-        ExecuteMsg::SubmitSetup { game_id, ready, cells, .. } => submit_setup(
+        ExecuteMsg::SubmitSetup { game_id, cells, .. } => submit_setup(
             deps,
             &info.sender,
             game_id,
-            ready,
             cells,
         ),
         ExecuteMsg::AttackCell { game_id, cell, .. } => attack_cell(
@@ -2374,8 +2373,24 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             query_package_info(deps, package_id, page, page_size, viewer, None)
         }
         // Battleship
-        QueryMsg::ListGames { page_size, page } => query_list_games(deps, page, page_size),
-        QueryMsg::GameState { game_id } => query_game_state(deps, game_id),
+        QueryMsg::ListGames { page_size, page, viewer } => {
+            // check if viewer is an owner
+            ViewingKey::check(deps.storage, &viewer.address, &viewer.viewing_key)?;
+            let own_inv = Inventory::new(
+                deps.storage,
+                deps.api.addr_canonicalize(viewer.address.as_str())?
+            )?;
+            if own_inv.cnt == 0 {
+                return Err(StdError::generic_err("Unauthorized"));
+            }
+
+            query_list_games(deps, page, page_size)
+        }
+        QueryMsg::GameState { game_id, viewer } => {
+            ViewingKey::check(deps.storage, &viewer.address, &viewer.viewing_key)?;
+            let address_raw = deps.api.addr_canonicalize(viewer.address.as_str())?;
+            query_game_state(deps, game_id, address_raw)
+        }
 
         QueryMsg::WithPermit { permit, query } => permit_queries(deps, &env, permit, query),
     };
@@ -2410,7 +2425,7 @@ pub fn permit_queries(
     )?;
     if !permit.check_permission(&secret_toolkit::permit::TokenPermissions::Owner) {
         return Err(StdError::generic_err(format!(
-            "Owner permission is required for SNIP-721 queries, got permissions {:?}",
+            "Owner permission is required for SNIP-821 queries, got permissions {:?}",
             permit.params.permissions
         )));
     }
@@ -2494,6 +2509,21 @@ pub fn permit_queries(
         }
         QueryWithPermit::PackageInfo { package_id, page, page_size } => {
             query_package_info(deps, package_id, page, page_size, None, Some(querier))
+        }
+        QueryWithPermit::ListGames { page_size, page } => {
+            // check if querier is an owner
+            let own_inv = Inventory::new(
+                deps.storage,
+                querier
+            )?;
+            if own_inv.cnt == 0 {
+                return Err(StdError::generic_err("Unauthorized"));
+            }
+            
+            query_list_games(deps, page, page_size)
+        }
+        QueryWithPermit::GameState { game_id } => {
+            query_game_state(deps, game_id, querier)
         }
     }
 }
@@ -3691,10 +3721,7 @@ pub fn query_storage_owner_get(
     let data = keys
         .into_iter()
         .map(|key| {
-            //println!("key_value_store: {:?}", [PREFIX_STORAGE_OWNER, address_raw.as_slice()]);
-            //println!("key.as_bytes(): {:?}", key.as_bytes());
             let may_value = may_load::<String>(&key_value_store, key.as_bytes()).unwrap_or(None);
-            //println!("may_value: {:?}", may_value);
             if let Some(value) = may_value {
                 KeyValuePair {
                     key,
@@ -3993,7 +4020,7 @@ pub fn query_package_info(
         let access = info[0].access.clone();
         if access != ACCESS_PUBLIC_STRING {
             if viewer.is_none() && querier.is_none() {
-                return Err(StdError::generic_err("unauthorized"))
+                return Err(StdError::generic_err("Unauthorized"))
             }
             let address_raw = if let Some(viewer) = viewer { deps.api.addr_canonicalize(viewer.address.as_str())? } else { querier.unwrap() };
             let inventory = Inventory::new(deps.storage, address_raw)?;

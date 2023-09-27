@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use secret_toolkit::permit::Permit;
 use serde::{Deserialize, Serialize};
 
-use crate::battleship::{NewGame, PlayerRole, GameState, CellValue};
+use crate::battleship::{ListedGame, PlayerRole, GameState, CellValue};
 use crate::expiration::Expiration;
 use crate::mint_run::{MintRunInfo, SerialNumber};
 use crate::nfp::RawData;
@@ -520,8 +520,8 @@ pub enum ExecuteMsg {
     ///
     /// Battleship functions
     /// 
-    /// Creates a new game in the lobby
-    NewGame {
+    /// Creates a new listed game in the lobby
+    ListedGame {
         title: String,
         padding: Option<String>,
     },
@@ -536,8 +536,7 @@ pub enum ExecuteMsg {
     SubmitSetup {
         padding: Option<String>,
         game_id: String,
-        ready: Option<bool>,
-        cells: Vec<CellValue>,
+        cells: Vec<u8>,
     },
     
     /// Player submits their move attacking an opponent's cell `w = x + (y * 10)` where w is in [0,99]
@@ -761,9 +760,9 @@ pub enum ExecuteAnswer {
     },
 
     /// Battleship
-    /// Creates a new game in the lobby
-    NewGame {
-        game: NewGame,
+    /// Creates a new listed game in the lobby
+    ListedGame {
+        game: ListedGame,
     },
     
     /// Joins a new game that is currently waiting for another player
@@ -1108,11 +1107,13 @@ pub enum QueryMsg {
     ListGames {
         page_size: Option<u32>,
         page: Option<u32>,
+        viewer: ViewerInfo,
     },
     
     /// Fetches the current game state
     GameState {
         game_id: String,
+        viewer: ViewerInfo,
     },
 
     /// perform queries by passing permits instead of viewing keys
@@ -1320,7 +1321,7 @@ pub enum QueryAnswer {
     // Battleship query answers
     /// Fetches a list of active games in the lobby
     ListGames {
-        games: Vec<NewGame>,
+        games: Vec<ListedGame>,
     },
     
     /// Fetches the current game state
@@ -1510,5 +1511,19 @@ pub enum QueryWithPermit {
         page: Option<u32>,
         /// page size
         page_size: Option<u32>,
+    },
+
+    ///
+    /// Battleship queries
+    /// 
+    /// Fetches a list of active games in the lobby
+    ListGames {
+        page_size: Option<u32>,
+        page: Option<u32>,
+    },
+    
+    /// Fetches the current game state
+    GameState {
+        game_id: String,
     },
 }
