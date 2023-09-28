@@ -14,7 +14,11 @@ use secret_toolkit::{
     viewing_key::{ViewingKey, ViewingKeyStore}, serialization::{Json, Serde}, 
 };
 
-use crate::{expiration::Expiration, battleship::{join_game, submit_setup, attack_cell, claim_victory, query_list_games, query_game_state, listed_game}};
+use crate::expiration::Expiration;
+use crate::battleship::{
+    join_game, submit_setup, attack_cell, claim_victory, query_list_games, 
+    query_game_state, list_game,
+};
 use crate::nfp::{
     add_any_delegate, add_token_delegate, remove_any_delegate, remove_token_delegate, remove_all_any_delegates, remove_all_token_delegates, 
     ANY_DELEGATES, TOKEN_DELEGATES, TOKEN_DELEGATES_INVERSE, ACCESS_PUBLIC_STRING, ACCESS_OWNERS_STRING, ACCESS_CLEARED_STRING, KEY_CLEARED_PACKAGES, 
@@ -524,7 +528,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ),
 
         // Battleship
-        ExecuteMsg::ListedGame { title, .. } => listed_game(
+        ExecuteMsg::NewGame { title, .. } => list_game(
             deps,
             env,
             info,

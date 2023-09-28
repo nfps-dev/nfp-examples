@@ -1,11 +1,11 @@
 #![allow(clippy::large_enum_variant)]
 
-use cosmwasm_std::{Addr, Binary, Coin};
+use cosmwasm_std::{Addr, Binary, Coin, Timestamp};
 use schemars::JsonSchema;
 use secret_toolkit::permit::Permit;
 use serde::{Deserialize, Serialize};
 
-use crate::battleship::{ListedGame, PlayerRole, GameState, CellValue};
+use crate::battleship::{ListedGame, PlayerRole, CellValue, TurnState};
 use crate::expiration::Expiration;
 use crate::mint_run::{MintRunInfo, SerialNumber};
 use crate::nfp::RawData;
@@ -521,7 +521,7 @@ pub enum ExecuteMsg {
     /// Battleship functions
     /// 
     /// Creates a new listed game in the lobby
-    ListedGame {
+    NewGame {
         title: String,
         padding: Option<String>,
     },
@@ -761,7 +761,7 @@ pub enum ExecuteAnswer {
 
     /// Battleship
     /// Creates a new listed game in the lobby
-    ListedGame {
+    NewGame {
         game: ListedGame,
     },
     
@@ -1326,10 +1326,15 @@ pub enum QueryAnswer {
     
     /// Fetches the current game state
     GameState {
+        game_id: String,
+        wager: Coin,
+        title: String,
+        created: Timestamp,
+        // 
         role: PlayerRole,
-        state: GameState,
-        tracking: Vec<CellValue>,
-        board: Vec<CellValue>,
+        state: TurnState,
+        home: Vec<CellValue>,
+        away: Vec<CellValue>,
     },
 }
 

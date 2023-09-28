@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use schemars::JsonSchema;
 use cosmwasm_std::{Coin, Timestamp, DepsMut, Addr, StdResult, Response, to_binary, Uint128, Deps, Binary, StdError, CanonicalAddr, MessageInfo, Env};
 
-use crate::msg::{ExecuteAnswer, ResponseStatus, QueryAnswer};
+use crate::{msg::{ExecuteAnswer, ResponseStatus, QueryAnswer}, inventory::Inventory};
 
 pub const DENOM: &str = "uscrt";
 pub const BOARD_SIZE: usize = 100; // 100
@@ -29,7 +29,7 @@ pub enum PlayerRole {
 /// Describes the state of an initiated game (fits into u8)
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug, JsonSchema)]
 #[repr(u8)]
-pub enum GameState {
+pub enum TurnState {
     /// waiting for another player to join
     WaitingForPlayer = 0,
     /// waiting for both players to submit their setups
@@ -165,12 +165,21 @@ fn valid_setup(
     true
 }
 
-pub fn listed_game(
+pub fn list_game(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     title: String,
 ) -> StdResult<Response> {
+    // Test if an owner
+    let own_inv = Inventory::new(
+        deps.storage,
+        deps.api.addr_canonicalize(info.sender.as_str())?
+    )?;
+    if own_inv.cnt == 0 {
+        return Err(StdError::generic_err("Unauthorized"));
+    }
+
     let created = env.block.time.clone();
     let mut wager = 0_u128;
     if info.funds.len() == 1 {
@@ -205,7 +214,7 @@ pub fn listed_game(
 
     GAME_STATE_STORE
         .add_suffix(game_id.as_bytes())
-        .save(deps.storage, &(GameState::WaitingForPlayer as u8))?;
+        .save(deps.storage, &(TurnState::WaitingForPlayer as u8))?;
 
     let game = ListedGame { 
         game_id, 
@@ -218,7 +227,7 @@ pub fn listed_game(
     };
 
     Ok(
-        Response::new().set_data(to_binary(&ExecuteAnswer::ListedGame {
+        Response::new().set_data(to_binary(&ExecuteAnswer::NewGame {
             game
         })?),
     )
@@ -229,6 +238,15 @@ pub fn join_game(
     sender: &Addr,
     game_id: String,
 ) -> StdResult<Response> {
+    // Test if an owner
+    let own_inv = Inventory::new(
+        deps.storage,
+        deps.api.addr_canonicalize(sender.as_str())?
+    )?;
+    if own_inv.cnt == 0 {
+        return Err(StdError::generic_err("Unauthorized"));
+    }
+
     // check if game id exists
     let listed_game = LISTED_GAMES_STORE.get(deps.storage, &game_id);
     if listed_game.is_none() {
@@ -245,7 +263,7 @@ pub fn join_game(
         .save(deps.storage, &joiner_addr)?;
 
     if let Some(game_state) = GAME_STATE_STORE.add_suffix(game_id.as_bytes()).may_load(deps.storage)? {
-        if game_state != GameState::WaitingForPlayer as u8 {
+        if game_state != TurnState::WaitingForPlayer as u8 {
             return Err(StdError::generic_err("Game state is not waiting for player"));
         }
     } else {
@@ -253,10 +271,7 @@ pub fn join_game(
     }
     GAME_STATE_STORE
         .add_suffix(game_id.as_bytes())
-        .save(deps.storage, &(GameState::WaitingForBothPlayersSetup as u8))?;
-
-    let listed_game: StoredListedGame = listed_game.unwrap();
-
+        .save(deps.storage, &(TurnState::WaitingForBothPlayersSetup as u8))?;
 
     Ok(
         Response::new().set_data(to_binary(&ExecuteAnswer::JoinGame { 
@@ -282,10 +297,11 @@ pub fn submit_setup(
     }
     let listed_game = listed_game.unwrap();
     let first_mover_turn = match listed_game.initiator_goes_first {
-        true => GameState::InitiatorsTurn,
-        false => GameState::JoinersTurn,
+        true => TurnState::InitiatorsTurn,
+        false => TurnState::JoinersTurn,
     };
 
+    // identify if initiator or joiner (or neither)
     let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     let initiator: bool;
     if sender_raw == listed_game.initiator {
@@ -305,11 +321,11 @@ pub fn submit_setup(
 
     if let Some(game_state) = GAME_STATE_STORE.add_suffix(game_id.as_bytes()).may_load(deps.storage)? {
         if initiator {
-            if game_state == GameState::WaitingForBothPlayersSetup as u8 {
+            if game_state == TurnState::WaitingForBothPlayersSetup as u8 {
                 GAME_STATE_STORE
                     .add_suffix(game_id.as_bytes())
-                    .save(deps.storage, &(GameState::WaitingForJoinerSetup as u8))?;
-            } else if game_state == GameState::WaitingForInitiatorSetup as u8 {
+                    .save(deps.storage, &(TurnState::WaitingForJoinerSetup as u8))?;
+            } else if game_state == TurnState::WaitingForInitiatorSetup as u8 {
                 GAME_STATE_STORE
                     .add_suffix(game_id.as_bytes())
                     .save(deps.storage, &(first_mover_turn as u8))?;
@@ -324,8 +340,8 @@ pub fn submit_setup(
                 .add_suffix(game_id.as_bytes())
                 .save(
                     deps.storage,
-                    &StoredTracking {
-                        tracking_values: vec![0_u8; BOARD_SIZE],
+                    &StoredAway {
+                        away_values: vec![CellValue::Empty as u8; BOARD_SIZE],
                         carrier_hits: 0,
                         battleship_hits: 0,
                         cruiser_hits: 0,
@@ -334,11 +350,11 @@ pub fn submit_setup(
                     }
                 )?;
         } else { // joiner
-            if game_state == GameState::WaitingForBothPlayersSetup as u8 {
+            if game_state == TurnState::WaitingForBothPlayersSetup as u8 {
                 GAME_STATE_STORE
                     .add_suffix(game_id.as_bytes())
-                    .save(deps.storage, &(GameState::WaitingForInitiatorSetup as u8))?;
-            } else if game_state == GameState::WaitingForJoinerSetup as u8 {
+                    .save(deps.storage, &(TurnState::WaitingForInitiatorSetup as u8))?;
+            } else if game_state == TurnState::WaitingForJoinerSetup as u8 {
                 GAME_STATE_STORE
                     .add_suffix(game_id.as_bytes())
                     .save(deps.storage, &(first_mover_turn as u8))?;
@@ -353,8 +369,8 @@ pub fn submit_setup(
                 .add_suffix(game_id.as_bytes())
                 .save(
                     deps.storage,
-                    &StoredTracking {
-                        tracking_values: vec![0_u8; BOARD_SIZE],
+                    &StoredAway {
+                        away_values: vec![CellValue::Empty as u8; BOARD_SIZE],
                         carrier_hits: 0,
                         battleship_hits: 0,
                         cruiser_hits: 0,
@@ -367,7 +383,6 @@ pub fn submit_setup(
         return Err(StdError::generic_err("Invalid game state"));
     }
 
-    // ... TODO
     Ok(
         Response::new().set_data(to_binary(&ExecuteAnswer::SubmitSetup { 
             status: ResponseStatus::Success 
@@ -381,8 +396,239 @@ pub fn attack_cell(
     game_id: String,
     cell: u8,
 ) -> StdResult<Response> {
-    // ... TODO
-    let result = CellValue::Miss;
+    // check if game id exists
+    let listed_game = LISTED_GAMES_STORE.get(deps.storage, &game_id);
+    if listed_game.is_none() {
+        return Err(StdError::generic_err("No listed game with that id"));
+    }
+    let listed_game = listed_game.unwrap();
+
+    // identify if initiator or joiner (or neither)
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
+    let initiator: bool;
+    if sender_raw == listed_game.initiator {
+        initiator = true;
+    } else {
+        let joiner = JOINER_STORE.add_suffix(game_id.as_bytes()).may_load(deps.storage)?;
+        if let Some(joiner) = joiner {
+            if joiner == listed_game.initiator {
+                initiator = false;
+            } else {
+                return Err(StdError::generic_err("Unauthorized"));
+            }
+        } else {
+            return Err(StdError::generic_err("Unauthorized"));
+        }
+    }
+
+    let cell = cell as usize;
+    if cell >= BOARD_SIZE {
+        return Err(StdError::generic_err("Cell index is out of bounds"));
+    }
+
+    let result: CellValue;
+    if let Some(game_state) = GAME_STATE_STORE.add_suffix(game_id.as_bytes()).may_load(deps.storage)? {
+        if initiator && game_state == TurnState::InitiatorsTurn as u8 {
+            let initiator_away = INITIATOR_AWAY_STORE
+                .add_suffix(game_id.as_bytes())
+                .may_load(deps.storage)?;
+            if let Some(mut initiator_away) = initiator_away {
+                let current_away_cell_value = initiator_away.away_values[cell];
+                if current_away_cell_value != CellValue::Empty as u8 {
+                    return Err(StdError::generic_err("You have already attacked this cell"));
+                }
+                let joiner_home = JOINER_HOME_STORE
+                    .add_suffix(game_id.as_bytes())
+                    .may_load(deps.storage)?;
+                if let Some(mut joiner_home) = joiner_home {
+                    let opponent_cell_value = joiner_home[cell];
+                    if opponent_cell_value == CellValue::Empty as u8 {
+                        initiator_away.away_values[cell] = CellValue::Miss as u8;
+                        result = CellValue::Miss;
+                    } else if opponent_cell_value == CellValue::Carrier as u8 {
+                        initiator_away.away_values[cell] |= CellValue::Hit as u8;
+                        initiator_away.carrier_hits += 1;
+                        if initiator_away.carrier_hits == CARRIER_SIZE {
+                            // the carrier has been sunk, reveal the type
+                            for value in &mut initiator_away.away_values {
+                                if *value == CellValue::Carrier as u8 {
+                                    *value |= CellValue::Carrier as u8;
+                                }
+                            }
+                        }
+                        joiner_home[cell] |= CellValue::Hit as u8;
+                        result = CellValue::Hit;
+                    } else if opponent_cell_value == CellValue::Battleship as u8 {
+                        initiator_away.away_values[cell] |= CellValue::Hit as u8;
+                        initiator_away.battleship_hits += 1;
+                        if initiator_away.battleship_hits == BATTLESHIP_SIZE {
+                            // the battleship has been sunk, reveal the type
+                            for value in &mut initiator_away.away_values {
+                                if *value == CellValue::Battleship as u8 {
+                                    *value |= CellValue::Battleship as u8;
+                                }
+                            }
+                        }
+                        joiner_home[cell] |= CellValue::Hit as u8;
+                        result = CellValue::Hit;
+                    } else if opponent_cell_value == CellValue::Cruiser as u8 {
+                        initiator_away.away_values[cell] |= CellValue::Hit as u8;
+                        initiator_away.cruiser_hits += 1;
+                        if initiator_away.cruiser_hits == CRUISER_SIZE {
+                            // the cruiser has been sunk, reveal the type
+                            for value in &mut initiator_away.away_values {
+                                if *value == CellValue::Cruiser as u8 {
+                                    *value |= CellValue::Cruiser as u8;
+                                }
+                            }
+                        }
+                        joiner_home[cell] |= CellValue::Hit as u8;
+                        result = CellValue::Hit;
+                    } else if opponent_cell_value == CellValue::Submarine as u8 {
+                        initiator_away.away_values[cell] |= CellValue::Hit as u8;
+                        initiator_away.submarine_hits += 1;
+                        if initiator_away.submarine_hits == SUBMARINE_SIZE {
+                            // the submarine has been sunk, reveal the type
+                            for value in &mut initiator_away.away_values {
+                                if *value == CellValue::Submarine as u8 {
+                                    *value |= CellValue::Submarine as u8;
+                                }
+                            }
+                        }
+                        joiner_home[cell] |= CellValue::Hit as u8;
+                        result = CellValue::Hit;
+                    } else if opponent_cell_value == CellValue::Destroyer as u8 {
+                        initiator_away.away_values[cell] |= CellValue::Hit as u8;
+                        initiator_away.destroyer_hits += 1;
+                        if initiator_away.destroyer_hits == DESTROYER_SIZE {
+                            // the destroyer has been sunk, reveal the type
+                            for value in &mut initiator_away.away_values {
+                                if *value == CellValue::Destroyer as u8 {
+                                    *value |= CellValue::Destroyer as u8;
+                                }
+                            }
+                        }
+                        joiner_home[cell] |= CellValue::Hit as u8;
+                        result = CellValue::Hit;
+                    } else {
+                        return Err(StdError::generic_err("Invalid cell value"));
+                    }
+                    INITIATOR_AWAY_STORE
+                        .add_suffix(game_id.as_bytes())
+                        .save(deps.storage, &initiator_away)?;
+                    JOINER_HOME_STORE
+                        .add_suffix(game_id.as_bytes())
+                        .save(deps.storage, &joiner_home)?;
+                } else {
+                    return Err(StdError::generic_err("Error reading opponent home from storage"));
+                }
+            } else {
+                return Err(StdError::generic_err("Error reading away from storage"));
+            }
+        } else if !initiator && game_state == TurnState::JoinersTurn as u8 {
+            let joiner_away = JOINER_AWAY_STORE
+                .add_suffix(game_id.as_bytes())
+                .may_load(deps.storage)?;
+            if let Some(mut joiner_away) = joiner_away {
+                let current_away_cell_value = joiner_away.away_values[cell];
+                if current_away_cell_value != CellValue::Empty as u8 {
+                    return Err(StdError::generic_err("You have already attacked this cell"));
+                }
+                let initiator_home = INITIATOR_HOME_STORE
+                    .add_suffix(game_id.as_bytes())
+                    .may_load(deps.storage)?;
+                if let Some(mut initiator_home) = initiator_home {
+                    let opponent_cell_value = initiator_home[cell];
+                    if opponent_cell_value == CellValue::Empty as u8 {
+                        joiner_away.away_values[cell] = CellValue::Miss as u8;
+                        result = CellValue::Miss;
+                    } else if opponent_cell_value == CellValue::Carrier as u8 {
+                        joiner_away.away_values[cell] |= CellValue::Hit as u8;
+                        joiner_away.carrier_hits += 1;
+                        if joiner_away.carrier_hits == CARRIER_SIZE {
+                            // the carrier has been sunk, reveal the type
+                            for value in &mut joiner_away.away_values {
+                                if *value == CellValue::Carrier as u8 {
+                                    *value |= CellValue::Carrier as u8;
+                                }
+                            }
+                        }
+                        initiator_home[cell] |= CellValue::Hit as u8;
+                        result = CellValue::Hit;
+                    } else if opponent_cell_value == CellValue::Battleship as u8 {
+                        joiner_away.away_values[cell] |= CellValue::Hit as u8;
+                        joiner_away.battleship_hits += 1;
+                        if joiner_away.battleship_hits == BATTLESHIP_SIZE {
+                            // the battleship has been sunk, reveal the type
+                            for value in &mut joiner_away.away_values {
+                                if *value == CellValue::Battleship as u8 {
+                                    *value |= CellValue::Battleship as u8;
+                                }
+                            }
+                        }
+                        initiator_home[cell] |= CellValue::Hit as u8;
+                        result = CellValue::Hit;
+                    } else if opponent_cell_value == CellValue::Cruiser as u8 {
+                        joiner_away.away_values[cell] |= CellValue::Hit as u8;
+                        joiner_away.cruiser_hits += 1;
+                        if joiner_away.cruiser_hits == CRUISER_SIZE {
+                            // the cruiser has been sunk, reveal the type
+                            for value in &mut joiner_away.away_values {
+                                if *value == CellValue::Cruiser as u8 {
+                                    *value |= CellValue::Cruiser as u8;
+                                }
+                            }
+                        }
+                        initiator_home[cell] |= CellValue::Hit as u8;
+                        result = CellValue::Hit;
+                    } else if opponent_cell_value == CellValue::Submarine as u8 {
+                        joiner_away.away_values[cell] |= CellValue::Hit as u8;
+                        joiner_away.submarine_hits += 1;
+                        if joiner_away.submarine_hits == SUBMARINE_SIZE {
+                            // the submarine has been sunk, reveal the type
+                            for value in &mut joiner_away.away_values {
+                                if *value == CellValue::Submarine as u8 {
+                                    *value |= CellValue::Submarine as u8;
+                                }
+                            }
+                        }
+                        initiator_home[cell] |= CellValue::Hit as u8;
+                        result = CellValue::Hit;
+                    } else if opponent_cell_value == CellValue::Destroyer as u8 {
+                        joiner_away.away_values[cell] |= CellValue::Hit as u8;
+                        joiner_away.destroyer_hits += 1;
+                        if joiner_away.destroyer_hits == DESTROYER_SIZE {
+                            // the destroyer has been sunk, reveal the type
+                            for value in &mut joiner_away.away_values {
+                                if *value == CellValue::Destroyer as u8 {
+                                    *value |= CellValue::Destroyer as u8;
+                                }
+                            }
+                        }
+                        initiator_home[cell] |= CellValue::Hit as u8;
+                        result = CellValue::Hit;
+                    } else {
+                        return Err(StdError::generic_err("Invalid cell value"));
+                    }
+                    JOINER_AWAY_STORE
+                        .add_suffix(game_id.as_bytes())
+                        .save(deps.storage, &joiner_away)?;
+                    INITIATOR_HOME_STORE
+                        .add_suffix(game_id.as_bytes())
+                        .save(deps.storage, &initiator_home)?;
+                } else {
+                    return Err(StdError::generic_err("Error reading opponent home from storage"));
+                }
+            } else {
+                return Err(StdError::generic_err("Error reading away from storage"));
+            }
+        } else {
+            return Err(StdError::generic_err("Not your turn to attack"));
+        }
+    } else {
+        return Err(StdError::generic_err("Invalid game state"));
+    }
+
     Ok(
         Response::new().set_data(to_binary(&ExecuteAnswer::AttackCell { 
             result 
@@ -436,9 +682,13 @@ pub fn query_game_state(
     // ... TODO
     to_binary(&QueryAnswer::GameState { 
         role: PlayerRole::Initiator, 
-        state: GameState::InitiatorsTurn, 
-        tracking: vec![], 
-        board: vec![] 
+        state: TurnState::InitiatorsTurn, 
+        home: vec![], 
+        away: vec![],
+        game_id: "game".to_string(),
+        wager: Coin { denom: "uscrt".to_string(), amount: Uint128::from(0_u128) },
+        title: "title".to_string(),
+        created: Timestamp::from_nanos(0_u64),
     })
 }
 
@@ -455,8 +705,8 @@ pub struct StoredListedGame {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct StoredTracking {
-    pub tracking_values: Vec<u8>,
+pub struct StoredAway {
+    pub away_values: Vec<u8>,
     pub carrier_hits: u8,
     pub battleship_hits: u8,
     pub cruiser_hits: u8,
@@ -468,8 +718,8 @@ pub static GAME_STATE_STORE: Item<u8> = Item::new(b"game-state");
 pub static JOINER_STORE: Item<CanonicalAddr> = Item::new(b"game-joiner");
 pub static INITIATOR_HOME_STORE: Item<Vec<u8>> = Item::new(b"initiator-home");
 pub static JOINER_HOME_STORE: Item<Vec<u8>> = Item::new(b"joiner-home");
-pub static INITIATOR_AWAY_STORE: Item<StoredTracking> = Item::new(b"initiator-away");
-pub static JOINER_AWAY_STORE: Item<StoredTracking> = Item::new(b"joiner-away");
+pub static INITIATOR_AWAY_STORE: Item<StoredAway> = Item::new(b"initiator-away");
+pub static JOINER_AWAY_STORE: Item<StoredAway> = Item::new(b"joiner-away");
 // game_id -> listed game
 pub static LISTED_GAMES_STORE: Keymap<String, StoredListedGame> = Keymap::new(b"listed-games");
 
@@ -598,7 +848,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let execute_msg = ExecuteMsg::ListedGame { 
+        let execute_msg = ExecuteMsg::NewGame { 
             title: "game 1".to_string(),
             padding: None
         };
