@@ -433,8 +433,7 @@ pub fn attack_cell(
                 .add_suffix(game_id.as_bytes())
                 .may_load(deps.storage)?;
             if let Some(mut initiator_away) = initiator_away {
-                let current_away_cell_value = initiator_away.away_values[cell];
-                if current_away_cell_value != CellValue::Empty as u8 {
+                if initiator_away.away_values[cell] != CellValue::Empty as u8 {
                     return Err(StdError::generic_err("You have already attacked this cell"));
                 }
                 let joiner_home = JOINER_HOME_STORE
@@ -444,6 +443,7 @@ pub fn attack_cell(
                     let opponent_cell_value = joiner_home[cell];
                     if opponent_cell_value == CellValue::Empty as u8 {
                         initiator_away.away_values[cell] = CellValue::Miss as u8;
+                        joiner_home[cell] = CellValue::Miss as u8;
                         result = CellValue::Miss;
                     } else if opponent_cell_value == CellValue::Carrier as u8 {
                         initiator_away.away_values[cell] |= CellValue::Hit as u8;
@@ -530,8 +530,7 @@ pub fn attack_cell(
                 .add_suffix(game_id.as_bytes())
                 .may_load(deps.storage)?;
             if let Some(mut joiner_away) = joiner_away {
-                let current_away_cell_value = joiner_away.away_values[cell];
-                if current_away_cell_value != CellValue::Empty as u8 {
+                if joiner_away.away_values[cell] != CellValue::Empty as u8 {
                     return Err(StdError::generic_err("You have already attacked this cell"));
                 }
                 let initiator_home = INITIATOR_HOME_STORE
@@ -541,6 +540,7 @@ pub fn attack_cell(
                     let opponent_cell_value = initiator_home[cell];
                     if opponent_cell_value == CellValue::Empty as u8 {
                         joiner_away.away_values[cell] = CellValue::Miss as u8;
+                        initiator_home[cell] = CellValue::Miss as u8;
                         result = CellValue::Miss;
                     } else if opponent_cell_value == CellValue::Carrier as u8 {
                         joiner_away.away_values[cell] |= CellValue::Hit as u8;
