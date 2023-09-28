@@ -60,8 +60,8 @@
 			"dependencies": {}
 		},
 		"app": {
-			"version": "0.6",
-			"hash": "8b9b83fd27cb",
+			"version": "0.8",
+			"hash": "c26e8f76d40a",
 			"exports": {
 				".": {
 					"SA_OWNER": {
@@ -89,48 +89,31 @@
 					},
 					"A_COMCS": {
 						"symbol": "h"
+					},
+					"K_SERVICE": {
+						"symbol": "i",
+						"dynamic": true
+					},
+					"Z_AUTH": {
+						"symbol": "j",
+						"dynamic": true
 					}
 				}
 			},
 			"dependencies": {
-				"storage": {
-					"version": "0.1",
-					"hash": "c87091d4dc20",
-					"dynamic": true,
-					"imports": {}
-				},
 				"bootloader": {
 					"version": "0.2",
 					"hash": "5d66fb5ccabb"
 				}
 			}
 		},
-		"storage": {
-			"version": "0.1",
-			"hash": "c87091d4dc20",
+		"template": {
+			"version": "0.0",
+			"hash": "44136fa355b3",
 			"exports": {
-				".": {
-					"readOwner": {
-						"symbol": "a"
-					},
-					"writeOwner": {
-						"symbol": "b"
-					},
-					"findFeegranter": {
-						"symbol": "c"
-					}
-				}
+				".": {}
 			},
-			"dependencies": {
-				"app": {
-					"version": "0.6",
-					"hash": "8b9b83fd27cb"
-				},
-				"bootloader": {
-					"version": "0.2",
-					"hash": "5d66fb5ccabb"
-				}
-			}
+			"dependencies": {}
 		}
 	}
 }

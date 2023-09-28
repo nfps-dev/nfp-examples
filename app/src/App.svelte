@@ -1,30 +1,152 @@
 <script lang="ts">
-	import Wallet from '@nfps.dev/components/src/Wallet.svelte';
-	import {qs, qsa} from '@nfps.dev/runtime';
+	import type {Coin, Timestamp, Uint128} from '@solar-republic/contractor';
 	
-	// use import statements for any modules that are already loaded by the time 'app' starts loading
-	import {
-		K_CONTRACT,
-		SH_VIEWING_KEY,
-		ls_read,
-		ls_write,
-	} from 'nfpx:bootloader';
+	import NeutrinoWallet, {type UiController} from '@nfps.dev/components/NeutrinoWallet';
+	
+	import {K_CONTRACT} from 'nfpx:bootloader';
+	
+	import {PlayerRole, type ActiveGame, type ListedGame, GameState, CellValue} from './interface/app';
+	
+	import {XG_LIMIT_BASE} from './stores';
+	
+	import Game from './Game.svelte';
+	import Lobby from './Lobby.svelte';
 
 	const {
 		K_WALLET,
+		K_SERVICE,
+		Z_AUTH,
 		SA_OWNER,
 		A_COMCS,
 		dm_foreign,
 	} = destructureImportedNfpModule('app');
 
-	// before 'App.svelte' is instantiated, 'main.ts' dynamically loads the 'storage' module.
-	// use an reserved function to import from the loaded module rather than a static import.
-	// this way, the destructuring expression will not get moved outside the svelte component.
-	const {
-		readOwner,
-		writeOwner,
-	} = destructureImportedNfpModule('storage');
+	// join a listed game
+	const join_game = async({detail:g_game}: CustomEvent<ListedGame>) => {
+		// indicate busy status
+		y_neutrino.status(b_loading=true);
 
+		// submit join request
+		const [, xc_code, s_res] = await K_SERVICE.exec('join_game', {
+			game_id: g_game.game_id,
+		}, XG_LIMIT_BASE, [
+			[g_game.wager.amount, 'uscrt'],
+		]);
+
+		// toggle off busy flag
+		y_neutrino.status(b_loading=false);
+
+		// did not work
+		if(xc_code) {
+			y_neutrino.tx_err(s_res);
+		}
+		// success
+		else {
+			g_active_game_listing = g_game;
+			g_active_game_state = {
+				role: PlayerRole.JOINER,
+				state: GameState.WAITING_FOR_BOTH_PLAYERS_SETUP,
+				home: Array(100).fill(CellValue.EMPTY),
+				away: Array(100).fill(CellValue.EMPTY),
+			};
+		}
+	};
+
+	// 
+	const reconnect_game = async(si_game: string) => {
+		// fetch game state
+		const [g_res, xc_code, s_err] = await K_SERVICE.query('game_state', {
+			game_id: si_game,
+		}, Z_AUTH);
+
+		// failed to fetch
+		if(xc_code) {
+			s_error = `Failed to load running game: ${s_err}`;
+
+			throw new Error(`Failed to load game state: ${s_err}`);
+		}
+		// success
+		else {
+			// set active game
+			g_active_game_listing = g_res!;
+			g_active_game_state = g_res!;
+		}
+	};
+
+	// init
+	const load = async() => {
+		// wait
+		b_loading = true;
+
+		// query for active games
+		const [g_res, xc_code, s_err] = await K_SERVICE.query('active_games', {}, Z_AUTH);
+
+		// query failed
+		if(xc_code) {
+			s_error = `Failed to check for running games. Try reloading.\n\n${s_err}`;
+		}
+		// success
+		else {
+			// games running
+			const a_active = g_res!.game_ids;
+			if(a_active.length) {
+				// query for game
+				for(const si_game of a_active) {
+					await reconnect_game(si_game);
+				}
+			}
+		}
+
+		// done loading
+		b_loading = false;
+	};
+
+	const show_board = import.meta.env? () => {
+		g_active_game_state = {
+			role: PlayerRole.JOINER,
+			state: GameState.WAITING_FOR_BOTH_PLAYERS_SETUP,
+			home: Array(100).fill(CellValue.EMPTY),
+			away: Array(100).fill(CellValue.EMPTY),
+		};
+
+		g_active_game_listing = {
+			created: (Date.now()*1e3)+'' as Timestamp,
+			title: 'Test',
+			game_id: 'dev',
+			wager: {
+				amount: '0' as Uint128,
+				denom: 'uscrt',
+			} as Coin,
+		};
+	}: void 0;
+
+
+	// dom bindings
+	let dm_error: HTMLDialogElement;
+
+	// whether a game is currently being joined
+	let b_loading = false;
+
+	// error message
+	let s_error = '';
+
+	// active game
+	let g_active_game_listing: ListedGame;
+	let g_active_game_state: ActiveGame;
+
+	let y_neutrino: UiController;
+
+	$: if(s_error) {
+		dm_error.showModal();
+	}
+
+	// start load
+	if(!import.meta.env.DEV) {
+		void load();
+	}
+	else {
+		show_board!();
+	}
 </script>
 
 <style lang="less">
@@ -32,10 +154,6 @@
 
 	:global(#app) {
 		--ease-out-quick: @ease-out-quick;
-	}
-
-	:global(*) {
-		color: #f7f7f7;
 	}
 
 	section {
@@ -92,24 +210,30 @@
 	}
 </style>
 
-<section bind:this={dm_section}>
-	<div class="flex spaced">
-		<h3 class:on={!b_loading && b_writable}>
-			<i /> {b_loading? 'Loading...': b_writable? 'Synced': 'Awaiting Wallet'}
-		</h3>
-	</div>
+<dialog class="error" bind:this={dm_error} on:close={() => s_error = ''}>
+	<form method="dialog">
+		<h3>Error</h3>
 
-	<div>
-		<fieldset disabled={b_loading || !b_writable}>
-			<input id="name" type="text" autocomplete="off"
-				disabled={b_locked} bind:value={s_name} placeholder={s_placeholder}>
-			<button on:click={edit_name}>{s_action}</button>
-		</fieldset>
-	</div>
+		<p>
+			{s_error}
+		</p>
 
-	<!-- <Notifications /> -->
-</section>
+		<button class="cta" on:click={() => dm_error.close()}>
+			Dismiss
+		</button>
+	</form>
+</dialog>
 
-<Wallet
-	args={[K_WALLET, SA_OWNER, [SH_VIEWING_KEY, SA_OWNER], A_COMCS, K_CONTRACT, dm_foreign]}
-	/>
+{#if import.meta.env.DEV}
+	<button on:click={show_board}>
+		Dev: Show Board
+	</button>
+{/if}
+
+{#if g_active_game_listing}
+	<Game g_listing={g_active_game_listing} g_state={g_active_game_state} />
+{:else}
+	<Lobby b_busy={b_loading} {y_neutrino} on:join={join_game} />
+{/if}
+
+<NeutrinoWallet args={[K_WALLET, SA_OWNER, Z_AUTH, A_COMCS, K_CONTRACT, dm_foreign]} bind:controller={y_neutrino} />

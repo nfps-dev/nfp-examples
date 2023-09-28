@@ -4,7 +4,8 @@ import {nfpModule} from '@nfps.dev/sdk';
 import {defineConfig} from 'rollup';
 
 export default defineConfig([
-	'storage',
+	// 'storage',
+	'template',
 ].map(sr_lib => ({
 	input: `applibs/src/${sr_lib}/main.ts`,
 	output: {

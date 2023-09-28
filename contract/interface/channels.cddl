@@ -1,0 +1,14 @@
+
+game_listed = [
+	game_id: text,
+	title: text,
+	wager_uscrt: biguint,
+]
+
+player_joined = [
+	game_id: text,
+]
+
+opponent_attacked = [
+	cell: uint,
+]

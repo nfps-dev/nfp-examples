@@ -1,8 +1,12 @@
 import type {NfpxExports} from './env';
-import type {HttpsUrl, SecretBech32} from '@solar-republic/neutrino';
+import type {SecretAccAddr} from '@solar-republic/contractor';
+import type {AuthSecret_ViewerInfo, HttpsUrl} from '@solar-republic/neutrino';
 
 import {create_svg, create_html, ls_write, ls_write_b64, ls_read_b64} from '@nfps.dev/runtime';
-import {Wallet, gen_sk, exec_contract} from '@solar-republic/neutrino';
+import {Wallet, gen_sk, exec_contract, SecretApp} from '@solar-republic/neutrino';
+
+// autoimport types so that svelte components can destructure
+import type {} from 'nfpx:app';
 
 // reuse as much as possible from the bootloader to cut down on app's bundle size
 import {
@@ -17,9 +21,17 @@ import {
 	nfp_attr,
 } from 'nfpx:bootloader';
 
+// import compiled global css
+import SX_CSS_GLOBAL from './global.less?inline';
+
+// import root svelte component
 import App from './App.svelte';
 
+// document element root
 const dm_root = document.documentElement;
+
+// add global css to document
+dm_root.append(create_svg('style', {}, [SX_CSS_GLOBAL]));
 
 // read rpc data from nfp
 const dm_web = nfp_tags('web')?.[0];
@@ -58,12 +70,8 @@ dm_pause.onclick = () => {
 const si_storage_token_owner_addr = 'toa:'+A_TOKEN_LOCATION.join(':');
 
 // fetch token owner address
-const SA_OWNER = ls_read(si_storage_token_owner_addr) as SecretBech32
-	|| ls_write<SecretBech32>(si_storage_token_owner_addr, prompt('Please enter the account address that owns this token') || '');
-
-// const SA_OWNER = await idb_read<SecretBech32>(si_storage_token_owner_addr)
-// 	|| await idb_write(si_storage_token_owner_addr, prompt('Please enter ...'));
-
+const SA_OWNER = ls_read(si_storage_token_owner_addr) as SecretAccAddr
+	|| ls_write<SecretAccAddr>(si_storage_token_owner_addr, prompt('Please enter the account address that owns this token') || '');
 
 // go async
 (async() => {
@@ -77,19 +85,13 @@ const SA_OWNER = ls_read(si_storage_token_owner_addr) as SecretBech32
 	ls_write_b64('sk', atu8_sk);
 	console.log(`Hot wallet address: ${k_wallet.addr}`);
 
+	const z_auth = G_QUERY_PERMIT || [SH_VIEWING_KEY, SA_OWNER] as AuthSecret_ViewerInfo;
+
 	// dynamic export before importing libs (which depend on these exports)
 	exportNfpx({
 		K_WALLET: k_wallet,
-	});
-
-	// load the 'storage' module before launching 'App.svelte'
-	await import('nfpx:storage', {
-		contract: K_CONTRACT,
-		location: A_TOKEN_LOCATION,
-		auth: G_QUERY_PERMIT || [SH_VIEWING_KEY, SA_OWNER],
-		query: {
-			tag: '1.x',
-		},
+		K_SERVICE: SecretApp(k_wallet, K_CONTRACT, 0.125),
+		Z_AUTH: z_auth,
 	});
 
 	// launch the app

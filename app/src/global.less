@@ -1,0 +1,111 @@
+:root, dialog {
+	color: #f7f7f7;
+}
+
+// * {
+// 	color: #f7f7f7;
+// }
+
+input, button, select {
+	background: #333;
+	color: #ce3;
+	padding: 8px 12px;
+	border: 0;
+
+	&:focus {
+		outline: 1px solid orange;
+		border-radius: 2px;
+	}
+
+	&:disabled {
+		opacity: 0.8;
+	}
+}
+
+button {
+	cursor: pointer;
+}
+
+.cta {
+	background: orange;
+	color: #111;
+	font-weight: 700;
+}
+
+dialog {
+	background: #111;
+	border: 1px solid #888;
+	border-radius: 8px;
+	padding: 2em 4em;
+	max-width: 800px;
+	min-width: 200px;
+
+	&::backdrop {
+		background: #118c;
+	}
+
+	&.error {
+		h3 {
+			color: #c22;
+			margin-top: 0;
+		}
+
+		p {
+			color: #d99;
+		}
+
+		border-color: #b00;
+	}
+
+	p {
+		white-space: pre-line;
+	}
+}
+
+@xl_edge: 30px;
+@xl_edge2: @xl_edge * 2;
+
+.cols {
+	display: flex;
+	justify-content: space-around;
+	align-items: center;
+	width: calc(100% - @xl_edge2);
+	margin-left: @xl_edge;
+	height: @xl_edge;
+}
+
+.rows {
+	display: flex;
+	justify-content: space-around;
+	align-items: center;
+	flex-direction: column;
+	width: @xl_edge;
+	height: 100%;
+}
+
+.middle {
+	display: flex;
+	flex: 1;
+
+	table {
+		flex: 1;
+		border-collapse: collapse;
+	}
+
+	td {
+		border: 1px solid #6662;
+	}
+
+	td {
+		width: 35px;
+		height: 35px;
+
+		&:hover::after {
+			display: block;
+			width: 100%;
+			height: 100%;
+			content: " ";
+			background: #f008;
+		}
+	}
+}

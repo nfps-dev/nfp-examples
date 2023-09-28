@@ -1,15 +1,17 @@
 /// <reference types="@nfps.dev/sdk/env-vars" />
 /// <reference types="@nfps.dev/sdk/nfpx" />
 
+import type {AppInterface} from './interface/app';
 import type {Nilable, Promisable} from '@blake.regalia/belt';
 import type {SlimTokenLocation, load_script} from '@nfps.dev/runtime';
-import type {HttpsUrl, QueryPermit, SecretContract} from '@solar-republic/neutrino';
+import type {QueryPermit} from '@solar-republic/contractor';
+import type {HttpsUrl, SecretContract} from '@solar-republic/neutrino';
 
 // declare what the bootloader can export dynamically
 export interface NfpxExports {
 	A_TOKEN_LOCATION: SlimTokenLocation;
 	P_LCD: HttpsUrl;
-	K_CONTRACT: SecretContract;
+	K_CONTRACT: SecretContract<AppInterface>;
 	G_QUERY_PERMIT: Nilable<QueryPermit>;
 	SH_VIEWING_KEY: string;
 	P_COMC_HOST: HttpsUrl;

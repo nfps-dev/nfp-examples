@@ -104,9 +104,18 @@ const sx_out = await build({
 					href: './bootloader.dev.js'
 				})
 				// testing/production: inline script
-				: create.svg('script', {}, [
-					fs.readFileSync(`./dist/bootloader${B_DEV? '.dev': ''}.js`, 'utf8'),
-				]),
+				: (() => {
+					// load script contents and escape cdata closing tag
+					const sx_script = fs.readFileSync(`./dist/bootloader${B_DEV? '.dev': ''}.js`, 'utf8')
+						.replace(/\]\]>/g, ']]]]><![CDATA[>');
+
+					// create script element
+					const dm_script = create.svg('script');
+
+					// use cdata to embed script to conserve bytes instead of escaped entities
+					dm_script.innerHTML = `//<![CDATA[\n${sx_script} //]]>`;
+					return dm_script;
+				})(),
 
 			// fetch latest app from chain in production mode
 			...B_DEV? []: [

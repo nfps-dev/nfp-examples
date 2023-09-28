@@ -1,14 +1,18 @@
-import type {Coin, Timestamp, Uint128, Uint32, Uint8} from '@solar-republic/contractor/datatypes';
-import type {SecretContractInterface, Snip721} from '@solar-republic/contractor/snips';
-import type {MethodDescriptorGroup, MethodGroup, Execution, SentFunds} from '@solar-republic/contractor/typings';
 
-import {AccessLevel} from '@solar-republic/contractor/snip-721';
+import type {
+	Coin, Timestamp, Uint128, Uint32, Uint8,
+	SecretContractInterface, Snip52, Snip821,
+	MethodDescriptorGroup, MethodGroup, WithSnipAuthViewer, MakeQueryPermitVariants,
+} from '@solar-republic/contractor';
+import { U } from 'ts-toolbelt';
+
+// import {AccessLevel} from '@solar-republic/contractor/snip-721';
 
 // export type * from '@solar-republic/contractor/snip-721';
 
 // export * from '@solar-republic/contractor/snip-721';
 
-export {AccessLevel};
+// export {AccessLevel};
 
 type WagerAmountsScrt = '1' | '2' | '5' | '10';
 
@@ -57,6 +61,13 @@ export enum GameState {
  * Describes the occupancy of a cell (fits into u8)
  */
 export enum CellValue {
+	// nothing occupies the cell. used for both `home` and `away` grids
+	// for the `away` grid: this indicates player has not yet attacked cell
+	EMPTY,
+
+	// for `away` grid only: player missed the cell
+	MISS,
+
 	// part of the "Carrier" vessel occupies the cell
 	CARRIER,
 
@@ -72,26 +83,29 @@ export enum CellValue {
 	// part of the "Destroyer" vessel occupies the cell
 	DESTROYER,
 
-	// nothing occupies the cell. used for both `board` and `tracking` grids
-	// for the `tracking` grid: this indicates player has not yet attacked cell
-	EMPTY,
-
-	// for `tracking` grid only: player missed the cell
-	MISS,
-
-	// for `tracking grid only: player hit a vessel but has not yet sunk it
-	HIT_UNKNOWN,
+	// for `away` grid only: player hit a vessel but has not yet sunk it
+	HIT_UNKNOWN=0x80,
 }
 
 
 /**
  * Used to represent a game to prospective players browsing the lobby
  */
-export type NewGame = {
+export type ListedGame = {
 	game_id: string;
 	wager: Coin;
 	title: string;
 	created: Timestamp;
+};
+
+/**
+ * Used to represent the complete state of an active game
+ */
+export type ActiveGame = {
+	role: PlayerRole;
+	state: GameState;
+	home: CellValue[];
+	away: CellValue[];
 };
 
 // utility type that facilitates adding the same `game_id` key to each msg
@@ -101,19 +115,74 @@ type MsgsRequiresGameId<h_group extends MethodDescriptorGroup> = MethodGroup.Aug
 	};
 }>;
 
-export type App = SecretContractInterface<{
-	// extends: [Snip721];
+type AuthenticatedQueries = MethodGroup.Canonicalize<{
+	/**
+	 * Fetches a list of active games in the lobby
+	 */
+	list_games: [{
+		page_size?: Uint32;
+		page?: Uint32;
+	}, {
+		games: ListedGame[];
+	}];
+
+	/**
+	 * Gets the list of active games this player is party to
+	 */
+	active_games: [{}, {
+		game_ids: string[];
+	}];
+}
+& MsgsRequiresGameId<{
+	/**
+	 * Fetches the current game state
+	 */
+	game_state: [{}, ListedGame & ActiveGame];
+}>>;
+
+export type AppInterface<w_defer=never> = SecretContractInterface<{
+	extends: [
+		Snip52,
+		// Snip821,
+	];
+
+	config: {
+		snip52_channels: {
+			/**
+			 * A new game has been added to the lobby
+			 */
+			game_listed: [
+				game_id: string,
+				title: string,
+				wager_uscrt: Uint128,
+			];
+
+			/**
+			 * A player joined the user's new game
+			 */
+			player_joined: [
+				game_id: string,
+			];
+
+			/**
+			 * The opponent attacked a cell
+			 */
+			opponent_attacked: [
+				cell: Uint8,
+			];
+		};
+	};
 
 	executions: {
 		/**
 		 * Creates a new game in the lobby
 		 */
 		new_game: {
-			call: {
+			msg: {
 				title?: string;
 			};
 			response: {
-				game: NewGame;
+				game: ListedGame;
 			};
 			funds: {
 				amount: Uint128<'0' | `${WagerAmountsScrt}000000`>;
@@ -131,7 +200,6 @@ export type App = SecretContractInterface<{
 		 * Player submits their board setup
 		 */
 		submit_setup: [{
-			ready?: boolean;
 			cells: CellValue[];
 		}];
 
@@ -151,34 +219,10 @@ export type App = SecretContractInterface<{
 	}>;
 
 	queries: {
-		/**
-		 * Fetches a list of active games in the loby
-		 */
-		list_games: [{
-			page_size?: Uint32;
-			page?: Uint32;
-		}, {
-			games: NewGame[];
-		}];
-	}
-	& MsgsRequiresGameId<{
-		/**
-		 * Fetches the current game state
-		 */
-		game_state: [{}, {
-			role: PlayerRole;
-			state: GameState;
-			tracking: CellValue[];
-			board: CellValue[];
-		}];
-	}>;
+		with_permit: {
+			variants: U.ListOf<MakeQueryPermitVariants<AuthenticatedQueries>>;
+		};
+	} & WithSnipAuthViewer<AuthenticatedQueries>;
 }>;
 
-type def = App['config']['default_execution_answer'];
-type wtf = App['executions']['join_game']['merged']['response'];
-
-// type deb = App['executions']['join_game']
-type deb = App['executions']['join_game']['variants'];
-
-
-type insp = App['executions']['new_game']['variants'][0]['funds']['amount'];
+// type insp = AppInterface['queries']['with_permit']['variants'][1]

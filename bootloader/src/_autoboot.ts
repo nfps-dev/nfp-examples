@@ -2,7 +2,8 @@
  * This script is only used in the development environment. It's purpose is to emulate the boot process
  * offline instead of forcing you, the developer, to perform an actual boot every time you reload.
  */
-import type {HttpsUrl, SecretBech32} from '@solar-republic/neutrino';
+import type {SecretAccAddr} from '@solar-republic/contractor';
+import type {HttpsUrl} from '@solar-republic/neutrino';
 
 import {
 	create_svg,
@@ -23,7 +24,7 @@ export default function autoboot(): void {
 
 	// wait for document to load
 	addEventListener('load', async() => {
-		const sa_contract = h_env.SELF_CONTRACT as SecretBech32;
+		const sa_contract = h_env.SELF_CONTRACT as SecretAccAddr;
 		const p_lcd = h_env.WEB_LCDS?.split(',')[0] as HttpsUrl;
 		const p_comc = h_env.WEB_COMCS?.split(',')[0] as HttpsUrl;
 
