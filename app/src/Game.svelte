@@ -20,15 +20,23 @@
 	export let g_listing: ListedGame;
 
 	export let g_state: ActiveGame;
+
+	let b_game_on = false;
 </script>
 
 <style lang="less">
 	.board {
-		transform: perspective(30cm) translateY(-50px);
+		transform: perspective(30cm) translateY(-500px);
 		transform-style: preserve-3d;
 		width: 450px;
 		margin: 0 50px;
 		padding: 0 50px;
+
+		transition: transform 2s ease-in-out;
+	}
+
+	.game-on {
+		transform: perspective(30cm) translateY(-50px);
 	}
 </style>
 
@@ -38,13 +46,19 @@
 	</div>
 
 	<div>
-		<h3>
-			Position your fleet
-		</h3>
+		<div>
+			<h3>
+				Position your fleet
+			</h3>
 
-		<div class="board">
-			<Grid />
-			<Grid b_home />
+			<button on:click={() => b_game_on = true}>
+				Begin
+			</button>
+		</div>
+
+		<div class="board" class:game-on={b_game_on}>
+			<Grid b_game_on={b_game_on} />
+			<Grid b_game_on={b_game_on} b_home />
 		</div>
 	</div>
 </section>

@@ -209,7 +209,8 @@ export type AppInterface<w_defer=never> = SecretContractInterface<{
 		attack_cell: [{
 			cell: Uint8;
 		}, {
-			result: CellValue;
+			away: CellValue[];
+			// result: CellValue;
 		}];
 
 		/**
