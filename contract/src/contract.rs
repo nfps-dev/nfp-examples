@@ -14,7 +14,7 @@ use secret_toolkit::{
     viewing_key::{ViewingKey, ViewingKeyStore}, serialization::{Json, Serde}, 
 };
 
-use crate::{expiration::Expiration, snip52_exec_query::{query_channel_info, query_list_channels}};
+use crate::{expiration::Expiration, snip52_exec_query::{query_channel_info, query_list_channels}, snip52_crypto::hkdf_sha_256, snip52_state::INTERNAL_SECRET, snip52_channel::{Channel, GAME_LISTED_CHANNEL_SCHEMA, GAME_LISTED_CHANNEL_ID, PLAYER_JOINED_CHANNEL_ID, PLAYER_JOINED_CHANNEL_SCHEMA, OPPONENT_ATTACKED_CHANNEL_ID, OPPONENT_ATTACKED_CHANNEL_SCHEMA}};
 use crate::snip52_exec_query::{update_seed};
 use crate::battleship::{
     join_game, submit_setup, attack_cell, claim_victory, query_list_games, 
@@ -65,7 +65,7 @@ pub const ID_BLOCK_SIZE: u32 = 64;
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
@@ -79,11 +79,59 @@ pub fn instantiate(
         })
         .transpose()?
         .unwrap_or(creator_raw.clone());
-    let prng_seed = sha_256(
-        general_purpose::STANDARD
-            .encode(msg.entropy.as_str())
-            .as_bytes(),
-    );
+
+    // SNIP-52
+
+    // use entropy and env.random to create an internal secret for the contract
+    let entropy = msg.entropy.as_bytes();
+    let entropy_len = 16 + info.sender.to_string().len() + entropy.len();
+    let mut rng_entropy = Vec::with_capacity(entropy_len);
+    rng_entropy.extend_from_slice(&env.block.height.to_be_bytes());
+    rng_entropy.extend_from_slice(&env.block.time.seconds().to_be_bytes());
+    rng_entropy.extend_from_slice(info.sender.as_bytes());
+    rng_entropy.extend_from_slice(entropy);
+    let rng_seed = env.block.random.as_ref().unwrap();
+
+    // Create INTERNAL_SECRET
+    let salt = Some(sha_256(&rng_entropy).to_vec());
+    let internal_secret = hkdf_sha_256(
+        &salt, 
+        rng_seed.0.as_slice(), 
+        "contract_internal_secret".as_bytes()
+    )?;
+    INTERNAL_SECRET.save(
+        deps.storage, 
+        &internal_secret.to_vec()
+    )?;  
+
+    // Channels will generally be hard-coded in contracts
+    let channels: Vec<Channel> = vec![
+        Channel {
+            id: GAME_LISTED_CHANNEL_ID.to_string(),
+            schema: Some(GAME_LISTED_CHANNEL_SCHEMA.to_string()),
+        },
+        Channel {
+            id: PLAYER_JOINED_CHANNEL_ID.to_string(),
+            schema: Some(PLAYER_JOINED_CHANNEL_SCHEMA.to_string()),
+        },
+        Channel {
+            id: OPPONENT_ATTACKED_CHANNEL_ID.to_string(),
+            schema: Some(OPPONENT_ATTACKED_CHANNEL_SCHEMA.to_string()),
+        },
+    ];
+
+    channels.into_iter().for_each(|channel| {
+        channel.store(deps.storage).unwrap()
+    });
+
+    // updated prng seed calculation to use hkdf- BA
+
+    let prng_seed = hkdf_sha_256(
+        &salt, 
+        rng_seed.0.as_slice(), 
+        "contract_viewing_key".as_bytes()
+    )?;
+
     ViewingKey::set_seed(deps.storage, &prng_seed);
 
     let init_config = msg.config.unwrap_or_default();
