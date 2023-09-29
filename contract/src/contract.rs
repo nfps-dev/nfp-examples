@@ -14,7 +14,8 @@ use secret_toolkit::{
     viewing_key::{ViewingKey, ViewingKeyStore}, serialization::{Json, Serde}, 
 };
 
-use crate::expiration::Expiration;
+use crate::{expiration::Expiration, snip52_exec_query::{query_channel_info, query_list_channels}};
+use crate::snip52_exec_query::{update_seed};
 use crate::battleship::{
     join_game, submit_setup, attack_cell, claim_victory, query_list_games, 
     query_game_state, list_game,
@@ -556,6 +557,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             env,
             &info.sender,
             game_id,
+        ),
+
+        //SNIP-52
+        ExecuteMsg::UpdateSeed { signed_doc, .. } => update_seed(
+            deps,
+            env,
+            &info.sender, 
+            signed_doc
         ),
     };
     pad_handle_result(response, BLOCK_SIZE)
@@ -2396,6 +2405,15 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             query_game_state(deps, game_id, address_raw)
         }
 
+        // SNIP-52
+        QueryMsg::ListChannels{} => query_list_channels(deps),
+        QueryMsg::ChannelInfo { channels, viewer } => {
+            // make sure the viewing key is valid
+            ViewingKey::check(deps.storage, &viewer.address, &viewer.viewing_key)?;
+            let sender_raw = deps.api.addr_canonicalize(viewer.address.as_str())?;
+            query_channel_info(deps, &env, channels, sender_raw)
+        },
+
         QueryMsg::WithPermit { permit, query } => permit_queries(deps, &env, permit, query),
     };
     pad_query_result(response, BLOCK_SIZE)
@@ -2529,6 +2547,8 @@ pub fn permit_queries(
         QueryWithPermit::GameState { game_id } => {
             query_game_state(deps, game_id, querier)
         }
+        // SNIP-52
+        QueryWithPermit::ChannelInfo { channels } => query_channel_info(deps, &env, channels, querier)
     }
 }
 

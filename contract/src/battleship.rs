@@ -436,7 +436,7 @@ pub fn attack_cell(
         return Err(StdError::generic_err("Cell index is out of bounds"));
     }
 
-    let result: Vec<u8>;
+    let away: Vec<u8>;
     if let Some(game_state) = TURN_STATE_STORE.add_suffix(game_id.as_bytes()).may_load(deps.storage)? {
         if initiator && game_state == TurnState::InitiatorsTurn as u8 {
             let initiator_away = INITIATOR_AWAY_STORE
@@ -534,7 +534,7 @@ pub fn attack_cell(
                             .save(deps.storage, &(TurnState::JoinersTurn as u8))?;
                     }
 
-                    result = initiator_away.away_values;
+                    away = initiator_away.away_values;
                 } else {
                     return Err(StdError::generic_err("Error reading opponent home from storage"));
                 }
@@ -637,7 +637,7 @@ pub fn attack_cell(
                             .save(deps.storage, &(TurnState::InitiatorsTurn as u8))?;
                     }
 
-                    result = joiner_away.away_values;
+                    away = joiner_away.away_values;
                 } else {
                     return Err(StdError::generic_err("Error reading opponent home from storage"));
                 }
@@ -653,7 +653,7 @@ pub fn attack_cell(
 
     Ok(
         Response::new().set_data(to_binary(&ExecuteAnswer::AttackCell { 
-            result 
+            away 
         })?)
     )
 }

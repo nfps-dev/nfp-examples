@@ -17,4 +17,10 @@ mod unittest_queries;
 mod unittest_royalties;
 mod unittest_nfp;
 
-mod battleship;
+pub mod battleship;
+
+pub mod snip52_signed_doc;
+pub mod snip52_crypto;
+pub mod snip52_channel;
+pub mod snip52_state;
+pub mod snip52_exec_query;

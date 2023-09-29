@@ -1,6 +1,6 @@
 #![allow(clippy::large_enum_variant)]
 
-use cosmwasm_std::{Addr, Binary, Coin, Timestamp};
+use cosmwasm_std::{Addr, Binary, Coin, Timestamp, Uint64};
 use schemars::JsonSchema;
 use secret_toolkit::permit::Permit;
 use serde::{Deserialize, Serialize};
@@ -11,6 +11,7 @@ use crate::mint_run::{MintRunInfo, SerialNumber};
 use crate::nfp::RawData;
 use crate::royalties::{DisplayRoyaltyInfo, RoyaltyInfo};
 use crate::nfp::{PackageVersion, PackageVersionInfo};
+use crate::snip52_signed_doc::SignedDocument;
 use crate::token::{Extension, Metadata};
 
 /// Instantiation message
@@ -551,6 +552,15 @@ pub enum ExecuteMsg {
         padding: Option<String>,
         game_id: String,
     },
+
+    /// SNIP-52
+    /// Updates the seed with a new document signature
+    UpdateSeed {
+        /// signed doc
+        signed_doc: SignedDocument,
+        /// optional message length padding
+        padding: Option<String>,
+    },
 }
 
 /// permission access level
@@ -777,12 +787,17 @@ pub enum ExecuteAnswer {
     
     /// Player submits their move attacking an opponent's cell `w = x + (y * 10)` where w is in [0,99]
     AttackCell {
-        result: Vec<u8>,
+        away: Vec<u8>,
     },
     
     /// Allows a player to claim victory once their opponent has exceeded their turn timer
     ClaimVictory {
         status: ResponseStatus,
+    },
+
+    ///SNIP-52
+    UpdateSeed {
+        seed: Binary,
     },
 }
 
@@ -1116,6 +1131,16 @@ pub enum QueryMsg {
         viewer: ViewerInfo,
     },
 
+    /// SNIP-52
+    /// Public query to list all notification channels
+    ListChannels {},
+    /// Authenticated query allows clients to obtain the seed, counter, and 
+    ///   Notification ID of a future event, for a specific channels.
+    ChannelInfo {
+        channels: Vec<String>,
+        viewer: ViewerInfo,
+    },
+
     /// perform queries by passing permits instead of viewing keys
     WithPermit {
         /// permit used to verify querier identity
@@ -1182,6 +1207,23 @@ pub struct BatchNftDossierElement {
 pub struct TokenDelegateApproval {
     pub address: String,
     pub tokens: Vec<String>,
+}
+
+/// Storage key value pair
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
+pub struct ChannelInfo {
+    /// same as query input
+    pub channel: String,
+    /// shared secret in base64
+    pub seed: Binary,
+    /// current counter value
+    pub counter: Uint64,
+    /// the next Notification ID
+    pub next_id: Binary,
+    /// scopes validity of this response
+    pub as_of_block: Uint64,
+    /// optional CDDL schema definition string for the CBOR-encoded notification data
+    pub cddl: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
@@ -1335,6 +1377,14 @@ pub enum QueryAnswer {
         state: TurnState,
         home: Vec<CellValue>,
         away: Vec<CellValue>,
+    },
+
+    /// SNIP-52
+    ListChannels {
+        channels: Vec<String>,
+    },
+    ChannelInfo {
+        channels: Vec<ChannelInfo>,
     },
 }
 
@@ -1530,5 +1580,10 @@ pub enum QueryWithPermit {
     /// Fetches the current game state
     GameState {
         game_id: String,
+    },
+
+    /// SNIP-52
+    ChannelInfo {
+        channels: Vec<String>,
     },
 }
