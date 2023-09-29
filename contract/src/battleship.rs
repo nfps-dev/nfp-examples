@@ -212,7 +212,7 @@ pub fn list_game(
         },
     )?;
 
-    GAME_STATE_STORE
+    TURN_STATE_STORE
         .add_suffix(game_id.as_bytes())
         .save(deps.storage, &(TurnState::WaitingForPlayer as u8))?;
 
@@ -262,14 +262,14 @@ pub fn join_game(
         .add_suffix(game_id.as_bytes())
         .save(deps.storage, &joiner_addr)?;
 
-    if let Some(game_state) = GAME_STATE_STORE.add_suffix(game_id.as_bytes()).may_load(deps.storage)? {
+    if let Some(game_state) = TURN_STATE_STORE.add_suffix(game_id.as_bytes()).may_load(deps.storage)? {
         if game_state != TurnState::WaitingForPlayer as u8 {
             return Err(StdError::generic_err("Game state is not waiting for player"));
         }
     } else {
         return Err(StdError::generic_err("Invalid game state"));
     }
-    GAME_STATE_STORE
+    TURN_STATE_STORE
         .add_suffix(game_id.as_bytes())
         .save(deps.storage, &(TurnState::WaitingForBothPlayersSetup as u8))?;
 
@@ -319,14 +319,14 @@ pub fn submit_setup(
         }
     }
 
-    if let Some(game_state) = GAME_STATE_STORE.add_suffix(game_id.as_bytes()).may_load(deps.storage)? {
+    if let Some(game_state) = TURN_STATE_STORE.add_suffix(game_id.as_bytes()).may_load(deps.storage)? {
         if initiator {
             if game_state == TurnState::WaitingForBothPlayersSetup as u8 {
-                GAME_STATE_STORE
+                TURN_STATE_STORE
                     .add_suffix(game_id.as_bytes())
                     .save(deps.storage, &(TurnState::WaitingForJoinerSetup as u8))?;
             } else if game_state == TurnState::WaitingForInitiatorSetup as u8 {
-                GAME_STATE_STORE
+                TURN_STATE_STORE
                     .add_suffix(game_id.as_bytes())
                     .save(deps.storage, &(first_mover_turn as u8))?;
             } else {
@@ -351,11 +351,11 @@ pub fn submit_setup(
                 )?;
         } else { // joiner
             if game_state == TurnState::WaitingForBothPlayersSetup as u8 {
-                GAME_STATE_STORE
+                TURN_STATE_STORE
                     .add_suffix(game_id.as_bytes())
                     .save(deps.storage, &(TurnState::WaitingForInitiatorSetup as u8))?;
             } else if game_state == TurnState::WaitingForJoinerSetup as u8 {
-                GAME_STATE_STORE
+                TURN_STATE_STORE
                     .add_suffix(game_id.as_bytes())
                     .save(deps.storage, &(first_mover_turn as u8))?;
             } else {
@@ -388,6 +388,16 @@ pub fn submit_setup(
             status: ResponseStatus::Success 
         })?)
     )
+}
+
+fn has_won(
+    away: &StoredAway
+) -> bool {
+    let total_hits = away.carrier_hits + away.battleship_hits + away.cruiser_hits + away.submarine_hits + away.destroyer_hits;
+    if total_hits >= CARRIER_SIZE + BATTLESHIP_SIZE + CRUISER_SIZE + SUBMARINE_SIZE + DESTROYER_SIZE {
+        return true;
+    }
+    false
 }
 
 pub fn attack_cell(
@@ -426,8 +436,8 @@ pub fn attack_cell(
         return Err(StdError::generic_err("Cell index is out of bounds"));
     }
 
-    let result: CellValue;
-    if let Some(game_state) = GAME_STATE_STORE.add_suffix(game_id.as_bytes()).may_load(deps.storage)? {
+    let result: Vec<u8>;
+    if let Some(game_state) = TURN_STATE_STORE.add_suffix(game_id.as_bytes()).may_load(deps.storage)? {
         if initiator && game_state == TurnState::InitiatorsTurn as u8 {
             let initiator_away = INITIATOR_AWAY_STORE
                 .add_suffix(game_id.as_bytes())
@@ -444,7 +454,6 @@ pub fn attack_cell(
                     if opponent_cell_value == CellValue::Empty as u8 {
                         initiator_away.away_values[cell] = CellValue::Miss as u8;
                         joiner_home[cell] = CellValue::Miss as u8;
-                        result = CellValue::Miss;
                     } else if opponent_cell_value == CellValue::Carrier as u8 {
                         initiator_away.away_values[cell] |= CellValue::Hit as u8;
                         initiator_away.carrier_hits += 1;
@@ -457,7 +466,6 @@ pub fn attack_cell(
                             }
                         }
                         joiner_home[cell] |= CellValue::Hit as u8;
-                        result = CellValue::Hit;
                     } else if opponent_cell_value == CellValue::Battleship as u8 {
                         initiator_away.away_values[cell] |= CellValue::Hit as u8;
                         initiator_away.battleship_hits += 1;
@@ -470,7 +478,6 @@ pub fn attack_cell(
                             }
                         }
                         joiner_home[cell] |= CellValue::Hit as u8;
-                        result = CellValue::Hit;
                     } else if opponent_cell_value == CellValue::Cruiser as u8 {
                         initiator_away.away_values[cell] |= CellValue::Hit as u8;
                         initiator_away.cruiser_hits += 1;
@@ -483,7 +490,6 @@ pub fn attack_cell(
                             }
                         }
                         joiner_home[cell] |= CellValue::Hit as u8;
-                        result = CellValue::Hit;
                     } else if opponent_cell_value == CellValue::Submarine as u8 {
                         initiator_away.away_values[cell] |= CellValue::Hit as u8;
                         initiator_away.submarine_hits += 1;
@@ -496,7 +502,6 @@ pub fn attack_cell(
                             }
                         }
                         joiner_home[cell] |= CellValue::Hit as u8;
-                        result = CellValue::Hit;
                     } else if opponent_cell_value == CellValue::Destroyer as u8 {
                         initiator_away.away_values[cell] |= CellValue::Hit as u8;
                         initiator_away.destroyer_hits += 1;
@@ -509,7 +514,6 @@ pub fn attack_cell(
                             }
                         }
                         joiner_home[cell] |= CellValue::Hit as u8;
-                        result = CellValue::Hit;
                     } else {
                         return Err(StdError::generic_err("Invalid cell value"));
                     }
@@ -519,6 +523,18 @@ pub fn attack_cell(
                     JOINER_HOME_STORE
                         .add_suffix(game_id.as_bytes())
                         .save(deps.storage, &joiner_home)?;
+
+                    if has_won(&initiator_away) {
+                        TURN_STATE_STORE
+                            .add_suffix(game_id.as_bytes())
+                            .save(deps.storage, &(TurnState::GameOverInitiatorWon as u8))?;
+                    } else {
+                        TURN_STATE_STORE
+                            .add_suffix(game_id.as_bytes())
+                            .save(deps.storage, &(TurnState::JoinersTurn as u8))?;
+                    }
+
+                    result = initiator_away.away_values;
                 } else {
                     return Err(StdError::generic_err("Error reading opponent home from storage"));
                 }
@@ -541,7 +557,6 @@ pub fn attack_cell(
                     if opponent_cell_value == CellValue::Empty as u8 {
                         joiner_away.away_values[cell] = CellValue::Miss as u8;
                         initiator_home[cell] = CellValue::Miss as u8;
-                        result = CellValue::Miss;
                     } else if opponent_cell_value == CellValue::Carrier as u8 {
                         joiner_away.away_values[cell] |= CellValue::Hit as u8;
                         joiner_away.carrier_hits += 1;
@@ -554,7 +569,6 @@ pub fn attack_cell(
                             }
                         }
                         initiator_home[cell] |= CellValue::Hit as u8;
-                        result = CellValue::Hit;
                     } else if opponent_cell_value == CellValue::Battleship as u8 {
                         joiner_away.away_values[cell] |= CellValue::Hit as u8;
                         joiner_away.battleship_hits += 1;
@@ -567,7 +581,6 @@ pub fn attack_cell(
                             }
                         }
                         initiator_home[cell] |= CellValue::Hit as u8;
-                        result = CellValue::Hit;
                     } else if opponent_cell_value == CellValue::Cruiser as u8 {
                         joiner_away.away_values[cell] |= CellValue::Hit as u8;
                         joiner_away.cruiser_hits += 1;
@@ -580,7 +593,6 @@ pub fn attack_cell(
                             }
                         }
                         initiator_home[cell] |= CellValue::Hit as u8;
-                        result = CellValue::Hit;
                     } else if opponent_cell_value == CellValue::Submarine as u8 {
                         joiner_away.away_values[cell] |= CellValue::Hit as u8;
                         joiner_away.submarine_hits += 1;
@@ -593,7 +605,6 @@ pub fn attack_cell(
                             }
                         }
                         initiator_home[cell] |= CellValue::Hit as u8;
-                        result = CellValue::Hit;
                     } else if opponent_cell_value == CellValue::Destroyer as u8 {
                         joiner_away.away_values[cell] |= CellValue::Hit as u8;
                         joiner_away.destroyer_hits += 1;
@@ -606,7 +617,6 @@ pub fn attack_cell(
                             }
                         }
                         initiator_home[cell] |= CellValue::Hit as u8;
-                        result = CellValue::Hit;
                     } else {
                         return Err(StdError::generic_err("Invalid cell value"));
                     }
@@ -616,6 +626,18 @@ pub fn attack_cell(
                     INITIATOR_HOME_STORE
                         .add_suffix(game_id.as_bytes())
                         .save(deps.storage, &initiator_home)?;
+
+                    if has_won(&joiner_away) {
+                        TURN_STATE_STORE
+                            .add_suffix(game_id.as_bytes())
+                            .save(deps.storage, &(TurnState::GameOverJoinerWon as u8))?;
+                    } else {
+                        TURN_STATE_STORE
+                            .add_suffix(game_id.as_bytes())
+                            .save(deps.storage, &(TurnState::InitiatorsTurn as u8))?;
+                    }
+
+                    result = joiner_away.away_values;
                 } else {
                     return Err(StdError::generic_err("Error reading opponent home from storage"));
                 }
@@ -714,7 +736,7 @@ pub struct StoredAway {
     pub destroyer_hits: u8,
 }
 
-pub static GAME_STATE_STORE: Item<u8> = Item::new(b"game-state");
+pub static TURN_STATE_STORE: Item<u8> = Item::new(b"turn-state");
 pub static JOINER_STORE: Item<CanonicalAddr> = Item::new(b"game-joiner");
 pub static INITIATOR_HOME_STORE: Item<Vec<u8>> = Item::new(b"initiator-home");
 pub static JOINER_HOME_STORE: Item<Vec<u8>> = Item::new(b"joiner-home");

@@ -777,7 +777,7 @@ pub enum ExecuteAnswer {
     
     /// Player submits their move attacking an opponent's cell `w = x + (y * 10)` where w is in [0,99]
     AttackCell {
-        result: CellValue,
+        result: Vec<u8>,
     },
     
     /// Allows a player to claim victory once their opponent has exceeded their turn timer
