@@ -1209,19 +1209,15 @@ pub struct TokenDelegateApproval {
     pub tokens: Vec<String>,
 }
 
-/// Storage key value pair
+/// Channel info struct
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
 pub struct ChannelInfo {
     /// same as query input
     pub channel: String,
-    /// shared secret in base64
-    pub seed: Binary,
     /// current counter value
     pub counter: Uint64,
     /// the next Notification ID
     pub next_id: Binary,
-    /// scopes validity of this response
-    pub as_of_block: Uint64,
     /// optional CDDL schema definition string for the CBOR-encoded notification data
     pub cddl: Option<String>,
 }
@@ -1384,6 +1380,10 @@ pub enum QueryAnswer {
         channels: Vec<String>,
     },
     ChannelInfo {
+        /// shared secret in base64
+        seed: Binary,
+        /// scopes validity of this response
+        as_of_block: Uint64,
         channels: Vec<ChannelInfo>,
     },
 }

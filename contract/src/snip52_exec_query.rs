@@ -91,16 +91,16 @@ pub fn query_channel_info(
         channels_result.push(
             ChannelInfo {
                 channel,
-                seed: get_seed(deps.storage, &sender_raw)?, 
                 counter, 
                 next_id, 
-                as_of_block: Uint64::from(env.block.height),
                 cddl: schema,
             }
         )
     }
 
-    to_binary(&QueryAnswer::ChannelInfo { 
+    to_binary(&QueryAnswer::ChannelInfo {
+        seed: get_seed(deps.storage, &sender_raw)?, 
+        as_of_block: Uint64::from(env.block.height),
         channels: channels_result,
     })
 }
