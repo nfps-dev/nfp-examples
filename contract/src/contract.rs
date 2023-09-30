@@ -1,6 +1,5 @@
 /// This contract implements SNIP-821 standard
 use std::collections::HashSet;
-use base64::{engine::general_purpose, Engine as _};
 use cosmwasm_std::{
     attr, entry_point, to_binary, Addr, Api, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps,
     DepsMut, Env, MessageInfo, Response, StdError, StdResult, Storage, WasmMsg,
@@ -14,8 +13,13 @@ use secret_toolkit::{
     viewing_key::{ViewingKey, ViewingKeyStore}, serialization::{Json, Serde}, 
 };
 
-use crate::{expiration::Expiration, snip52_exec_query::{query_channel_info, query_list_channels}, snip52_crypto::hkdf_sha_256, snip52_state::INTERNAL_SECRET, snip52_channel::{Channel, GAME_LISTED_CHANNEL_SCHEMA, GAME_LISTED_CHANNEL_ID, GAME_UPDATED_CHANNEL_ID, GAME_UPDATED_CHANNEL_SCHEMA}, battleship::{new_game, query_active_games}};
-use crate::snip52_exec_query::{update_seed};
+use crate::expiration::Expiration;
+use crate::snip52_exec_query::{query_channel_info, query_list_channels};
+use crate::snip52_crypto::hkdf_sha_256;
+use crate::snip52_state::INTERNAL_SECRET;
+use crate::snip52_channel::{Channel, GAME_UPDATED_CHANNEL_ID, GAME_UPDATED_CHANNEL_SCHEMA};
+use crate::battleship::{new_game, query_active_games};
+use crate::snip52_exec_query::update_seed;
 use crate::battleship::{
     join_game, submit_setup, attack_cell, claim_victory, query_list_games, 
     query_game_state,

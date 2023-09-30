@@ -1,6 +1,5 @@
-use bech32::{ToBase32,Variant};
-use minicbor_ser as cbor;
-use hkdf::hmac::{Mac};
+use bech32::ToBase32;
+use hkdf::hmac::Mac;
 use cosmwasm_std::{DepsMut, Env, Addr, StdResult, Response, StdError, to_binary, Api, Storage, CanonicalAddr, Binary, Deps, Uint64};
 use crate::snip52_channel::{CHANNELS, CHANNEL_SCHEMATA};
 use crate::snip52_signed_doc::{SignedDocument, pubkey_to_account, Document};

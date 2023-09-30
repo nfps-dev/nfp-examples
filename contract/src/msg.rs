@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use secret_toolkit::permit::Permit;
 use serde::{Deserialize, Serialize};
 
-use crate::battleship::{ListedGame, PlayerRole, CellValue, TurnState};
+use crate::battleship::ListedGame;
 use crate::expiration::Expiration;
 use crate::mint_run::{MintRunInfo, SerialNumber};
 use crate::nfp::RawData;

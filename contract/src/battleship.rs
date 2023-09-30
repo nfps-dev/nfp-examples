@@ -1,13 +1,11 @@
 use std::convert::TryFrom;
-use rand_core::RngCore;
 use minicbor_ser as cbor;
-use hkdf::hmac::{Mac};
 use secret_toolkit::{storage::{Keyset, Item, Keymap}, crypto::ContractPrng};
 use serde::{Deserialize, Serialize};
 use schemars::JsonSchema;
 use cosmwasm_std::{
     Coin, Timestamp, DepsMut, Addr, StdResult, Response, to_binary, 
-    Uint128, Deps, Binary, StdError, CanonicalAddr, MessageInfo, Env, CosmosMsg, BankMsg, Storage, Api
+    Uint128, Deps, Binary, StdError, CanonicalAddr, MessageInfo, Env, CosmosMsg, BankMsg, Storage,
 };
 use crate::{msg::{ExecuteAnswer, ResponseStatus, QueryAnswer}, state::{load, CONFIG_KEY}};
 use crate::snip52_channel::GAME_UPDATED_CHANNEL_ID;
@@ -443,7 +441,7 @@ pub fn submit_setup(
     game_id: String,
     cells: Vec<u8>,
 ) -> StdResult<Response> {
-    let token_owner = verify_owner_or_delegate(
+    let _token_owner = verify_owner_or_delegate(
         deps.storage,
         &deps.api.addr_canonicalize(sender.as_str())?,
         &config,
@@ -623,7 +621,7 @@ pub fn attack_cell(
     game_id: String,
     cell: u8,
 ) -> StdResult<Response> {
-    let token_owner = verify_owner_or_delegate(
+    let _token_owner = verify_owner_or_delegate(
         deps.storage, 
         &deps.api.addr_canonicalize(sender.as_str())?,
         &config,
@@ -987,7 +985,7 @@ pub fn claim_victory(
     token_id: String,
     game_id: String,
 ) -> StdResult<Response> {
-    let token_owner = verify_owner_or_delegate(
+    let _token_owner = verify_owner_or_delegate(
         deps.storage,
         &deps.api.addr_canonicalize(sender.as_str())?,
         &config,
