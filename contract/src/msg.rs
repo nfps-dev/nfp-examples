@@ -523,34 +523,39 @@ pub enum ExecuteMsg {
     /// 
     /// Creates a new listed game in the lobby
     NewGame {
+        token_id: String,
         title: String,
         padding: Option<String>,
     },
     
     /// Joins a new game that is currently waiting for another player
     JoinGame {
-        padding: Option<String>,
+        token_id: String,
         game_id: String,
+        padding: Option<String>,
     },
     
     /// Player submits their board setup
     SubmitSetup {
-        padding: Option<String>,
+        token_id: String,
         game_id: String,
         cells: Vec<u8>,
+        padding: Option<String>,
     },
     
     /// Player submits their move attacking an opponent's cell `w = x + (y * 10)` where w is in [0,99]
     AttackCell {
-        padding: Option<String>,
+        token_id: String,
         game_id: String,
         cell: u8,
+        padding: Option<String>,
     },
     
     /// Allows a player to claim victory once their opponent has exceeded their turn timer
     ClaimVictory {
-        padding: Option<String>,
+        token_id: String,
         game_id: String,
+        padding: Option<String>,
     },
 
     /// SNIP-52
@@ -1122,11 +1127,19 @@ pub enum QueryMsg {
     ListGames {
         page_size: Option<u32>,
         page: Option<u32>,
+        token_id: String,
+        viewer: ViewerInfo,
+    },
+
+    /// Gets the list of active games the token is party to
+    ActiveGames {
+        token_id: String,
         viewer: ViewerInfo,
     },
     
     /// Fetches the current game state
     GameState {
+        token_id: String,
         game_id: String,
         viewer: ViewerInfo,
     },
@@ -1212,6 +1225,8 @@ pub struct TokenDelegateApproval {
 /// Channel info struct
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
 pub struct ChannelInfo {
+    /// shared secret in base64
+    pub seed: Binary,
     /// same as query input
     pub channel: String,
     /// current counter value
@@ -1361,6 +1376,11 @@ pub enum QueryAnswer {
     ListGames {
         games: Vec<ListedGame>,
     },
+
+    /// Gets the list of active games the token is party to
+    ActiveGames {
+        game_ids: Vec<String>,
+    },
     
     /// Fetches the current game state
     GameState {
@@ -1369,10 +1389,10 @@ pub enum QueryAnswer {
         title: String,
         created: Timestamp,
         // 
-        role: PlayerRole,
-        state: TurnState,
-        home: Vec<CellValue>,
-        away: Vec<CellValue>,
+        role: u8,
+        state: u8,
+        home: Vec<u8>,
+        away: Vec<u8>,
     },
 
     /// SNIP-52
@@ -1380,8 +1400,6 @@ pub enum QueryAnswer {
         channels: Vec<String>,
     },
     ChannelInfo {
-        /// shared secret in base64
-        seed: Binary,
         /// scopes validity of this response
         as_of_block: Uint64,
         channels: Vec<ChannelInfo>,
@@ -1575,10 +1593,17 @@ pub enum QueryWithPermit {
     ListGames {
         page_size: Option<u32>,
         page: Option<u32>,
+        token_id: String,
+    },
+
+    /// Gets the list of active games the token is party to
+    ActiveGames {
+        token_id: String,
     },
     
     /// Fetches the current game state
     GameState {
+        token_id: String,
         game_id: String,
     },
 

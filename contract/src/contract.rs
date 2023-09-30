@@ -14,11 +14,11 @@ use secret_toolkit::{
     viewing_key::{ViewingKey, ViewingKeyStore}, serialization::{Json, Serde}, 
 };
 
-use crate::{expiration::Expiration, snip52_exec_query::{query_channel_info, query_list_channels}, snip52_crypto::hkdf_sha_256, snip52_state::INTERNAL_SECRET, snip52_channel::{Channel, GAME_LISTED_CHANNEL_SCHEMA, GAME_LISTED_CHANNEL_ID, PLAYER_JOINED_CHANNEL_ID, PLAYER_JOINED_CHANNEL_SCHEMA, OPPONENT_ATTACKED_CHANNEL_ID, OPPONENT_ATTACKED_CHANNEL_SCHEMA}};
+use crate::{expiration::Expiration, snip52_exec_query::{query_channel_info, query_list_channels}, snip52_crypto::hkdf_sha_256, snip52_state::INTERNAL_SECRET, snip52_channel::{Channel, GAME_LISTED_CHANNEL_SCHEMA, GAME_LISTED_CHANNEL_ID, GAME_UPDATED_CHANNEL_ID, GAME_UPDATED_CHANNEL_SCHEMA}, battleship::{new_game, query_active_games}};
 use crate::snip52_exec_query::{update_seed};
 use crate::battleship::{
     join_game, submit_setup, attack_cell, claim_victory, query_list_games, 
-    query_game_state, list_game,
+    query_game_state,
 };
 use crate::nfp::{
     add_any_delegate, add_token_delegate, remove_any_delegate, remove_token_delegate, remove_all_any_delegates, remove_all_token_delegates, 
@@ -92,31 +92,23 @@ pub fn instantiate(
     rng_entropy.extend_from_slice(entropy);
     let rng_seed = env.block.random.as_ref().unwrap();
 
-    // Create INTERNAL_SECRET
+    // create internal secret
     let salt = Some(sha_256(&rng_entropy).to_vec());
     let internal_secret = hkdf_sha_256(
         &salt, 
         rng_seed.0.as_slice(), 
-        "contract_internal_secret".as_bytes()
+        "contract internal secret".as_bytes()
     )?;
     INTERNAL_SECRET.save(
         deps.storage, 
         &internal_secret.to_vec()
     )?;  
 
-    // Channels will generally be hard-coded in contracts
+    // create channels
     let channels: Vec<Channel> = vec![
         Channel {
-            id: GAME_LISTED_CHANNEL_ID.to_string(),
-            schema: Some(GAME_LISTED_CHANNEL_SCHEMA.to_string()),
-        },
-        Channel {
-            id: PLAYER_JOINED_CHANNEL_ID.to_string(),
-            schema: Some(PLAYER_JOINED_CHANNEL_SCHEMA.to_string()),
-        },
-        Channel {
-            id: OPPONENT_ATTACKED_CHANNEL_ID.to_string(),
-            schema: Some(OPPONENT_ATTACKED_CHANNEL_SCHEMA.to_string()),
+            id: GAME_UPDATED_CHANNEL_ID.to_string(),
+            schema: Some(GAME_UPDATED_CHANNEL_SCHEMA.to_string()),
         },
     ];
 
@@ -124,12 +116,12 @@ pub fn instantiate(
         channel.store(deps.storage).unwrap()
     });
 
-    // updated prng seed calculation to use hkdf- BA
+    // updated snip721 prng_seed calculation to use hkdf- BA
 
     let prng_seed = hkdf_sha_256(
         &salt, 
         rng_seed.0.as_slice(), 
-        "contract_viewing_key".as_bytes()
+        "contract viewing key".as_bytes()
     )?;
 
     ViewingKey::set_seed(deps.storage, &prng_seed);
@@ -577,33 +569,46 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ),
 
         // Battleship
-        ExecuteMsg::NewGame { title, .. } => list_game(
+        ExecuteMsg::NewGame { token_id, title, .. } => new_game(
             deps,
             env,
             info,
+            &config,
+            token_id,
             title,
         ),
-        ExecuteMsg::JoinGame { game_id, .. } => join_game(
+        ExecuteMsg::JoinGame { token_id, game_id, .. } => join_game(
             deps,
-            &info.sender,
+            env,
+            info,
+            &config,
+            token_id,
             game_id,
         ),
-        ExecuteMsg::SubmitSetup { game_id, cells, .. } => submit_setup(
+        ExecuteMsg::SubmitSetup { token_id, game_id, cells, .. } => submit_setup(
             deps,
             &info.sender,
+            env,
+            &config,
+            token_id,
             game_id,
             cells,
         ),
-        ExecuteMsg::AttackCell { game_id, cell, .. } => attack_cell(
-            deps,
-            &info.sender,
-            game_id,
-            cell,
-        ),
-        ExecuteMsg::ClaimVictory { game_id, .. } => claim_victory(
+        ExecuteMsg::AttackCell { token_id, game_id, cell, .. } => attack_cell(
             deps,
             env,
             &info.sender,
+            &config,
+            token_id,
+            game_id,
+            cell,
+        ),
+        ExecuteMsg::ClaimVictory { token_id, game_id, .. } => claim_victory(
+            deps,
+            env,
+            &info.sender,
+            &config,
+            token_id,
             game_id,
         ),
 
@@ -2434,23 +2439,29 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             query_package_info(deps, package_id, page, page_size, viewer, None)
         }
         // Battleship
-        QueryMsg::ListGames { page_size, page, viewer } => {
-            // check if viewer is an owner
-            ViewingKey::check(deps.storage, &viewer.address, &viewer.viewing_key)?;
-            let own_inv = Inventory::new(
-                deps.storage,
-                deps.api.addr_canonicalize(viewer.address.as_str())?
-            )?;
-            if own_inv.cnt == 0 {
-                return Err(StdError::generic_err("Unauthorized"));
-            }
-
-            query_list_games(deps, page, page_size)
-        }
-        QueryMsg::GameState { game_id, viewer } => {
+        QueryMsg::ListGames { 
+            page_size, 
+            page,
+            token_id,
+            viewer,
+        } => {
             ViewingKey::check(deps.storage, &viewer.address, &viewer.viewing_key)?;
             let address_raw = deps.api.addr_canonicalize(viewer.address.as_str())?;
-            query_game_state(deps, game_id, address_raw)
+            query_list_games(deps, token_id, page, page_size, &address_raw)
+        }
+        QueryMsg::ActiveGames { token_id, viewer } => {
+            ViewingKey::check(deps.storage, &viewer.address, &viewer.viewing_key)?;
+            let address_raw = deps.api.addr_canonicalize(viewer.address.as_str())?;
+            query_active_games(deps, token_id, &address_raw)
+        }
+        QueryMsg::GameState { 
+            token_id,
+            game_id, 
+            viewer 
+        } => {
+            ViewingKey::check(deps.storage, &viewer.address, &viewer.viewing_key)?;
+            let address_raw = deps.api.addr_canonicalize(viewer.address.as_str())?;
+            query_game_state(deps, token_id, game_id, &address_raw)
         }
 
         // SNIP-52
@@ -2580,20 +2591,14 @@ pub fn permit_queries(
         QueryWithPermit::PackageInfo { package_id, page, page_size } => {
             query_package_info(deps, package_id, page, page_size, None, Some(querier))
         }
-        QueryWithPermit::ListGames { page_size, page } => {
-            // check if querier is an owner
-            let own_inv = Inventory::new(
-                deps.storage,
-                querier
-            )?;
-            if own_inv.cnt == 0 {
-                return Err(StdError::generic_err("Unauthorized"));
-            }
-            
-            query_list_games(deps, page, page_size)
+        QueryWithPermit::ListGames { token_id, page_size, page } => {
+            query_list_games(deps, token_id, page, page_size, &querier)
         }
-        QueryWithPermit::GameState { game_id } => {
-            query_game_state(deps, game_id, querier)
+        QueryWithPermit::ActiveGames { token_id } => {
+            query_active_games(deps, token_id, &querier)
+        }
+        QueryWithPermit::GameState { token_id, game_id } => {
+            query_game_state(deps, token_id, game_id, &querier)
         }
         // SNIP-52
         QueryWithPermit::ChannelInfo { channels } => query_channel_info(deps, &env, channels, querier)
@@ -3782,9 +3787,6 @@ pub fn query_storage_owner_get(
         StdError::generic_err("This is being called incorrectly if there is no querier address")
     })?;
 
-    // validate permit
-    // validate viewing key
-
     let key_value_store = ReadonlyPrefixedStorage::multilevel(
         deps.storage, 
         &[PREFIX_STORAGE_OWNER, address_raw.as_slice()]
@@ -4593,7 +4595,7 @@ fn get_token_if_permitted(
 /// * `token_id` - token id string slice
 /// * `custom_err` - optional custom error message to use if don't want to reveal that a token
 ///                  does not exist
-fn get_token(
+pub fn get_token(
     storage: &dyn Storage,
     token_id: &str,
     custom_err: Option<&str>,

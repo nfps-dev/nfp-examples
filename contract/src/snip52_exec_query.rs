@@ -90,6 +90,7 @@ pub fn query_channel_info(
         let schema = CHANNEL_SCHEMATA.get(deps.storage, &channel);
         channels_result.push(
             ChannelInfo {
+                seed: get_seed(deps.storage, &sender_raw)?,
                 channel,
                 counter, 
                 next_id, 
@@ -99,7 +100,6 @@ pub fn query_channel_info(
     }
 
     to_binary(&QueryAnswer::ChannelInfo {
-        seed: get_seed(deps.storage, &sender_raw)?, 
         as_of_block: Uint64::from(env.block.height),
         channels: channels_result,
     })
@@ -162,7 +162,7 @@ fn validate_signed_doc(
 ///   return notificationID
 /// }
 /// 
-fn notification_id(
+pub fn notification_id(
     storage: &dyn Storage,
     addr: &CanonicalAddr,
     channel: &String,
@@ -223,7 +223,7 @@ fn notification_id(
 /// }
 /// 
 
-fn encrypt_notification_data(
+pub fn encrypt_notification_data(
     storage: &dyn Storage,
     env: &Env,
     sender: &Addr,

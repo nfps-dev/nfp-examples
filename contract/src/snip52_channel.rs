@@ -26,31 +26,15 @@ impl Channel {
     }
 }
 
-//TODO:
-//
-// game_listed = [
-//   game_id: text,
-//   title: text,
-//   wager_uscrt: biguint,
-// ]
-// player_joined = [
-//   game_id: text,
-// ]
-// opponent_attacked = [
-//   cell: uint8,
-// ]
+// Battleship channels
 
 /// id for the `game_listed` channel
 pub const GAME_LISTED_CHANNEL_ID: &str = "game_listed";
 /// CDDL Schema for game listed data
 pub const GAME_LISTED_CHANNEL_SCHEMA: &str = "game_listed=[game_id:text,title:text,wager_uscrt:biguint]";
 
-/// id for the `player_joined` channel
-pub const PLAYER_JOINED_CHANNEL_ID: &str = "player_joined";
-/// CDDL Schema for player joined data
-pub const PLAYER_JOINED_CHANNEL_SCHEMA: &str = "player_joined=[game_id:text]";
+/// id for `game_updated` channel
+pub const GAME_UPDATED_CHANNEL_ID: &str = "game_updated";
+/// CDDL Schema for the game updated data
+pub const GAME_UPDATED_CHANNEL_SCHEMA: &str = "game_updated=[game_id:text,home:[100 uint],turn:uint]";
 
-/// id for the `opponent_attacked` channel
-pub const OPPONENT_ATTACKED_CHANNEL_ID: &str = "opponent_attacked";
-/// CDDL Schema for opponent attacked data
-pub const OPPONENT_ATTACKED_CHANNEL_SCHEMA: &str = "opponent_attacked=[cell:uint8]";
