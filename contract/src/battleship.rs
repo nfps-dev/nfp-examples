@@ -884,7 +884,7 @@ pub fn attack_cell(
                         ACTIVE_GAMES_STORE
                             .add_suffix(token_id.as_bytes())
                             .remove(deps.storage, &game_id)?;
-                        let initiator_token = listed_game.initiator_token_id;
+                        let initiator_token = listed_game.clone().initiator_token_id;
                         ACTIVE_GAMES_STORE
                             .add_suffix(initiator_token.as_bytes())
                             .remove(deps.storage, &game_id)?;
@@ -1107,7 +1107,7 @@ pub fn claim_victory(
             TURN_STATE_STORE
                 .add_suffix(game_id.as_bytes())
                 .save(deps.storage, &(TurnState::GameOverJoinerWon as u8))?;
-            opponent_owner = listed_game.initiator_owner;
+            opponent_owner = listed_game.clone().initiator_owner;
             opponent_home = INITIATOR_HOME_STORE
                 .add_suffix(game_id.as_bytes())
                 .load(deps.storage)?;
