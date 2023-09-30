@@ -768,6 +768,9 @@ pub fn attack_cell(
                         // remove game from listed games
                         LISTED_GAMES_STORE
                             .remove(deps.storage, &game_id)?;
+                        // add game to finished games
+                        FINISHED_GAMES_STORE
+                            .insert(deps.storage, &game_id, &listed_game)?;
                     } else {
                         TURN_STATE_STORE
                             .add_suffix(game_id.as_bytes())
@@ -889,6 +892,9 @@ pub fn attack_cell(
                         // remove game from listed games
                         LISTED_GAMES_STORE
                             .remove(deps.storage, &game_id)?;
+                        // add game to finished games
+                        FINISHED_GAMES_STORE
+                            .insert(deps.storage, &game_id, &listed_game)?;
                     } else {
                         TURN_STATE_STORE
                             .add_suffix(game_id.as_bytes())
@@ -1047,6 +1053,15 @@ pub fn claim_victory(
         ACTIVE_GAMES_STORE
             .add_suffix(listed_game.initiator_token_id.as_bytes())
             .remove(deps.storage, &game_id)?;
+        TURN_STATE_STORE
+            .add_suffix(game_id.as_bytes())
+            .save(deps.storage, &(TurnState::GameOverInitiatorWon as u8))?;
+        // remove game from listed games
+        LISTED_GAMES_STORE
+            .remove(deps.storage, &game_id)?;
+        // add game to finished games
+        FINISHED_GAMES_STORE
+            .insert(deps.storage, &game_id, &listed_game)?;
 
         bank_msg = CosmosMsg::Bank(BankMsg::Send {
             to_address: sender.clone().into_string(),
@@ -1101,6 +1116,9 @@ pub fn claim_victory(
         // remove game from listed games
         LISTED_GAMES_STORE
             .remove(deps.storage, &game_id)?;
+        // add game to finished games
+        FINISHED_GAMES_STORE
+            .insert(deps.storage, &game_id, &listed_game)?;
 
         bank_msg = CosmosMsg::Bank(BankMsg::Send {
             to_address: sender.clone().into_string(),
@@ -1233,10 +1251,15 @@ pub fn query_game_state(
         &token_id
     )?;
 
-    let listed_game = LISTED_GAMES_STORE
+    let mut listed_game = LISTED_GAMES_STORE
         .get(deps.storage, &game_id);
     if listed_game.is_none() {
-        return Err(StdError::generic_err("Game is not listed"));
+        //check if it is a finished game instead
+        listed_game = FINISHED_GAMES_STORE
+            .get(deps.storage, &game_id);
+        if listed_game.is_none() {
+            return Err(StdError::generic_err("Game is not listed or finished"));
+        }
     }
     let listed_game = listed_game.unwrap();
     let joiner_token = JOINER_TOKEN_STORE
