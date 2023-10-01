@@ -1222,6 +1222,14 @@ pub struct TokenDelegateApproval {
     pub tokens: Vec<String>,
 }
 
+/// channel mode
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ChannelMode {
+    Counter,
+    Txhash,
+}
+
 /// Channel info struct
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
 pub struct ChannelInfo {
@@ -1229,6 +1237,8 @@ pub struct ChannelInfo {
     pub seed: Binary,
     /// same as query input
     pub channel: String,
+    /// either "counter" or "txhash"
+    pub mode: ChannelMode,
     /// current counter value
     pub counter: Uint64,
     /// the next Notification ID

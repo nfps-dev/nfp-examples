@@ -5,7 +5,7 @@ use crate::snip52_channel::{CHANNELS, CHANNEL_SCHEMATA};
 use crate::snip52_signed_doc::{SignedDocument, pubkey_to_account, Document};
 use crate::snip52_state::{get_seed, store_seed, get_count};
 use crate::snip52_crypto::{sha_256, HmacSha256, cipher_data};
-use crate::msg::{ExecuteAnswer, QueryAnswer, ChannelInfo};
+use crate::msg::{ExecuteAnswer, QueryAnswer, ChannelInfo, ChannelMode};
 
 pub const DATA_LEN: usize = 256;
 
@@ -91,6 +91,7 @@ pub fn query_channel_info(
             ChannelInfo {
                 seed: get_seed(deps.storage, &sender_raw)?,
                 channel,
+                mode: ChannelMode::Counter,
                 counter, 
                 next_id, 
                 cddl: schema,
