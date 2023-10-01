@@ -1,3 +1,12 @@
+UNAME := $(shell uname -m)
+
+# special variables to inject in build command depending on platform
+ARCH_VARS = 
+ifeq ($(UNAME),arm64)
+	ARCH_VARS = AR=/opt/homebrew/opt/llvm/bin/llvm-ar CC=/opt/homebrew/opt/llvm/bin/clang
+endif
+
+
 .PHONY: check
 check:
 	cargo check
@@ -13,20 +22,21 @@ test: unit-test
 unit-test:
 	cargo unit-test
 
+
 # This is a local build with debug-prints activated. Debug prints only show up
 # in the local development chain (see the `start-server` command below)
 # and mainnet won't accept contracts built with the feature enabled.
 .PHONY: build _build
 build: _build compress-wasm
 _build:
-	RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
+	$(ARCH_VARS) RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
 
 # This is a build suitable for uploading to mainnet.
 # Calls to `debug_print` get removed by the compiler.
 .PHONY: build-mainnet _build-mainnet
 build-mainnet: _build-mainnet compress-wasm
 _build-mainnet:
-	RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
+	$(ARCH_VARS) RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
 
 .PHONY: compile-optimized-reproducible
 compile-optimized-reproducible:
