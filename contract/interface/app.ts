@@ -4,15 +4,9 @@ import type {
 	SecretContractInterface, Snip52, Snip821,
 	MethodDescriptorGroup, MethodGroup, WithSnipAuthViewer, MakeQueryPermitVariants,
 } from '@solar-republic/contractor';
+
 import { U } from 'ts-toolbelt';
 
-// import {AccessLevel} from '@solar-republic/contractor/snip-721';
-
-// export type * from '@solar-republic/contractor/snip-721';
-
-// export * from '@solar-republic/contractor/snip-721';
-
-// export {AccessLevel};
 
 type WagerAmountsScrt = '1' | '2' | '5' | '10';
 
@@ -29,9 +23,9 @@ export enum PlayerRole {
 
 
 /**
- * Describes the state of an initiated game (fits into u8)
+ * Describes the turn state of an initiated game (fits into u8)
  */
-export enum GameState {
+export enum TurnState {
 	// waiting for another player to join
 	WAITING_FOR_PLAYER,
 
@@ -68,20 +62,20 @@ export enum CellValue {
 	// for `away` grid only: player missed the cell
 	MISS,
 
-	// part of the "Carrier" vessel occupies the cell
-	CARRIER,
+	// part of the "Titan" vessel occupies the cell (5)
+	TITAN,
 
-	// part of the "Battleship" vessel occupies the cell
-	BATTLESHIP,
+	// part of the "Enforcer" vessel occupies the cell (4)
+	ENFORCER,
 
-	// part of the "Cruiser" vessel occupies the cell
-	CRUISER,
+	// part of the "Drifter" vessel occupies the cell (3)
+	DRIFTER,
 
-	// part of the "Submarine" vessel occupies the cell
-	SUBMARINE,
+	// part of the "Crawler" vessel occupies the cell (3)
+	CRAWLER,
 
-	// part of the "Destroyer" vessel occupies the cell
-	DESTROYER,
+	// part of the "Scout" vessel occupies the cell (2)
+	SCOUT,
 
 	// for `away` grid only: player hit a vessel but has not yet sunk it
 	HIT_UNKNOWN=0x80,
@@ -103,42 +97,52 @@ export type ListedGame = {
  */
 export type ActiveGame = {
 	role: PlayerRole;
-	state: GameState;
+	state: TurnState;
 	home: CellValue[];
 	away: CellValue[];
 };
 
+type MsgsRequireTokenId<h_group extends MethodDescriptorGroup> = MethodGroup.Augment<h_group, {
+	msg: {
+		token_id: string;
+	};
+}>;
+
 // utility type that facilitates adding the same `game_id` key to each msg
-type MsgsRequiresGameId<h_group extends MethodDescriptorGroup> = MethodGroup.Augment<h_group, {
+type MsgsRequireGameId<h_group extends MethodDescriptorGroup> = MethodGroup.Augment<h_group, {
 	msg: {
 		game_id: string;
 	};
 }>;
 
-type AuthenticatedQueries = MethodGroup.Canonicalize<{
-	/**
-	 * Fetches a list of active games in the lobby
-	 */
-	list_games: [{
-		page_size?: Uint32;
-		page?: Uint32;
-	}, {
-		games: ListedGame[];
-	}];
+type AuthenticatedQueries = MethodGroup.Canonicalize<
+	MsgsRequireTokenId<
+		{
+			/**
+			 * Fetches a list of active games in the lobby
+			 */
+			list_games: [{
+				page_size?: Uint32;
+				page?: Uint32;
+			}, {
+				games: ListedGame[];
+			}];
 
-	/**
-	 * Gets the list of active games this player is party to
-	 */
-	active_games: [{}, {
-		game_ids: string[];
-	}];
-}
-& MsgsRequiresGameId<{
-	/**
-	 * Fetches the current game state
-	 */
-	game_state: [{}, ListedGame & ActiveGame];
-}>>;
+			/**
+			 * Gets the list of active games this player is party to
+			 */
+			active_games: [{}, {
+				game_ids: string[];
+			}];
+		}
+		& MsgsRequireGameId<{
+			/**
+			 * Fetches the current game state
+			 */
+			game_state: [{}, ListedGame & ActiveGame];
+		}>
+	>
+>;
 
 export type AppInterface<w_defer=never> = SecretContractInterface<{
 	extends: [
@@ -148,76 +152,73 @@ export type AppInterface<w_defer=never> = SecretContractInterface<{
 
 	config: {
 		snip52_channels: {
-			/**
-			 * A new game has been added to the lobby
-			 */
-			game_listed: [
-				game_id: string,
-				title: string,
-				wager_uscrt: Uint128,
-			];
+			// /**
+			//  * A new game has been added to the lobby
+			//  */
+			// game_listed: [
+			// 	game_id: string,
+			// 	title: string,
+			// 	wager_uscrt: Uint128,
+			// ];
 
 			/**
 			 * A player joined the user's new game
 			 */
-			player_joined: [
+			game_updated: [
 				game_id: string,
-			];
-
-			/**
-			 * The opponent attacked a cell
-			 */
-			opponent_attacked: [
-				cell: Uint8,
+				home: CellValue[],
+				state: TurnState,
 			];
 		};
 	};
 
-	executions: {
-		/**
-		 * Creates a new game in the lobby
-		 */
-		new_game: {
-			msg: {
-				title?: string;
+	executions: MsgsRequireTokenId<
+		{
+			/**
+			 * Creates a new game in the lobby
+			 */
+			new_game: {
+				msg: {
+					title?: string;
+				};
+				response: {
+					game: ListedGame;
+				};
+				funds: {
+					amount: Uint128<'0' | `${WagerAmountsScrt}000000`>;
+					denom: 'uscrt';
+				};
 			};
-			response: {
-				game: ListedGame;
-			};
-			funds: {
-				amount: Uint128<'0' | `${WagerAmountsScrt}000000`>;
-				denom: 'uscrt';
-			};
-		};
-	}
-	& MsgsRequiresGameId<{
-		/**
-		 * Joins a new game that is currently waiting for another player
-		 */
-		join_game: [{}];
+		}
+		& MsgsRequireGameId<{
+			/**
+			 * Joins a new game that is currently waiting for another player
+			 */
+			join_game: [{}];
 
-		/**
-		 * Player submits their board setup
-		 */
-		submit_setup: [{
-			cells: CellValue[];
-		}];
+			/**
+			 * Player submits their board setup
+			 */
+			submit_setup: [{
+				cells: CellValue[];
+			}];
 
-		/**
-		 * Player submits their move attacking an opponent's cell `w = x + (y * 10)` where w is in [0,99]
-		 */
-		attack_cell: [{
-			cell: Uint8;
-		}, {
-			away: CellValue[];
-			// result: CellValue;
-		}];
+			/**
+			 * Player submits their move attacking an opponent's cell `w = x + (y * 10)` where w is in [0,99]
+			 */
+			attack_cell: [{
+				cell: Uint8;
+			}, {
+				away: CellValue[];
+				// result: CellValue;
+			}];
 
-		/**
-		 * Allows a player to claim victory once their opponent has exceeded their turn timer
-		 */
-		claim_victory: [{}];
-	}>;
+			/**
+			 * Allows a player to claim victory once their opponent has exceeded their turn timer
+			 */
+			claim_victory: [{}];
+		}>
+	>;
 
 	queries: {
 		with_permit: {

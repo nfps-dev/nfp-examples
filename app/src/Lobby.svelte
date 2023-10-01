@@ -5,7 +5,7 @@
 	import type {Uint128, Coin, Timestamp} from '@solar-republic/contractor';
 	
 	import {subscribe_snip52_channels} from '@solar-republic/neutrino';
-	import {K_CONTRACT, SH_VIEWING_KEY} from 'nfpx:bootloader';
+	import {A_TOKEN_LOCATION, K_CONTRACT, SH_VIEWING_KEY} from 'nfpx:bootloader';
 	import {onMount} from 'svelte';
 	
 	import {XG_LIMIT_BASE} from './stores';
@@ -21,7 +21,9 @@
 
 	const refresh = async() => {
 		// query for listed games
-		const [g_res,, s_err] = await K_SERVICE.query('list_games', {}, Z_AUTH);
+		const [g_res,, s_err] = await K_SERVICE.query('list_games', {
+			token_id: A_TOKEN_LOCATION[2],
+		}, Z_AUTH);
 
 		// success; update games list
 		if(g_res) {
@@ -98,6 +100,7 @@
 
 		// submit launch request
 		const [g_ans,, s_res] = await K_SERVICE.exec('new_game', {
+			token_id: A_TOKEN_LOCATION[2],
 			title: s_title,
 		}, XG_LIMIT_BASE, '0' === sg_wager_uscrt as string? []: [
 			[sg_wager_uscrt, 'uscrt'],

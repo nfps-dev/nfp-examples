@@ -1,11 +1,12 @@
 <script lang="ts">
+	import type {ActiveGame, ListedGame} from './interface/app';
 	import type {Coin, Timestamp, Uint128} from '@solar-republic/contractor';
 	
 	import NeutrinoWallet, {type UiController} from '@nfps.dev/components/NeutrinoWallet';
 	
-	import {K_CONTRACT} from 'nfpx:bootloader';
+	import {A_TOKEN_LOCATION, K_CONTRACT} from 'nfpx:bootloader';
 	
-	import {PlayerRole, type ActiveGame, type ListedGame, GameState, CellValue} from './interface/app';
+	import {PlayerRole, TurnState, CellValue} from './interface/app';
 	
 	import {XG_LIMIT_BASE} from './stores';
 	
@@ -19,7 +20,15 @@
 		SA_OWNER,
 		A_COMCS,
 		dm_foreign,
+		dm_root,
 	} = destructureImportedNfpModule('app');
+
+	// prevent screen shifting
+	dm_root.addEventListener('mousedown', (d_event: MouseEvent) => {
+		if(d_event.shiftKey) {
+			d_event.preventDefault();
+		}
+	});
 
 	// join a listed game
 	const join_game = async({detail:g_game}: CustomEvent<ListedGame>) => {
@@ -28,6 +37,7 @@
 
 		// submit join request
 		const [, xc_code, s_res] = await K_SERVICE.exec('join_game', {
+			token_id: A_TOKEN_LOCATION[2],
 			game_id: g_game.game_id,
 		}, XG_LIMIT_BASE, [
 			[g_game.wager.amount, 'uscrt'],
@@ -45,7 +55,7 @@
 			g_active_game_listing = g_game;
 			g_active_game_state = {
 				role: PlayerRole.JOINER,
-				state: GameState.WAITING_FOR_BOTH_PLAYERS_SETUP,
+				state: TurnState.WAITING_FOR_BOTH_PLAYERS_SETUP,
 				home: Array(100).fill(CellValue.EMPTY),
 				away: Array(100).fill(CellValue.EMPTY),
 			};
@@ -56,6 +66,7 @@
 	const reconnect_game = async(si_game: string) => {
 		// fetch game state
 		const [g_res, xc_code, s_err] = await K_SERVICE.query('game_state', {
+			token_id: A_TOKEN_LOCATION[2],
 			game_id: si_game,
 		}, Z_AUTH);
 
@@ -79,7 +90,9 @@
 		b_loading = true;
 
 		// query for active games
-		const [g_res, xc_code, s_err] = await K_SERVICE.query('active_games', {}, Z_AUTH);
+		const [g_res, xc_code, s_err] = await K_SERVICE.query('active_games', {
+			token_id: A_TOKEN_LOCATION[2],
+		}, Z_AUTH);
 
 		// query failed
 		if(xc_code) {
@@ -104,7 +117,7 @@
 	const show_board = import.meta.env? () => {
 		g_active_game_state = {
 			role: PlayerRole.JOINER,
-			state: GameState.WAITING_FOR_BOTH_PLAYERS_SETUP,
+			state: TurnState.WAITING_FOR_BOTH_PLAYERS_SETUP,
 			home: Array(100).fill(CellValue.EMPTY),
 			away: Array(100).fill(CellValue.EMPTY),
 		};
@@ -154,6 +167,10 @@
 
 	:global(#app) {
 		--ease-out-quick: @ease-out-quick;
+	}
+
+	main {
+		user-select: none;
 	}
 
 	section {
@@ -210,30 +227,32 @@
 	}
 </style>
 
-<dialog class="error" bind:this={dm_error} on:close={() => s_error = ''}>
-	<form method="dialog">
-		<h3>Error</h3>
+<main>
+	<dialog class="error" bind:this={dm_error} on:close={() => s_error = ''}>
+		<form method="dialog">
+			<h3>Error</h3>
 
-		<p>
-			{s_error}
-		</p>
+			<p>
+				{s_error}
+			</p>
 
-		<button class="cta" on:click={() => dm_error.close()}>
-			Dismiss
+			<button class="cta" on:click={() => dm_error.close()}>
+				Dismiss
+			</button>
+		</form>
+	</dialog>
+
+	{#if import.meta.env.DEV}
+		<button on:click={show_board}>
+			Dev: Show Board
 		</button>
-	</form>
-</dialog>
+	{/if}
 
-{#if import.meta.env.DEV}
-	<button on:click={show_board}>
-		Dev: Show Board
-	</button>
-{/if}
-
-{#if g_active_game_listing}
-	<Game g_listing={g_active_game_listing} g_state={g_active_game_state} />
-{:else}
-	<Lobby b_busy={b_loading} {y_neutrino} on:join={join_game} />
-{/if}
+	{#if g_active_game_listing}
+		<Game g_listing={g_active_game_listing} g_state={g_active_game_state} {y_neutrino} />
+	{:else}
+		<Lobby b_busy={b_loading} {y_neutrino} on:join={join_game} />
+	{/if}
+</main>
 
 <NeutrinoWallet args={[K_WALLET, SA_OWNER, Z_AUTH, A_COMCS, K_CONTRACT, dm_foreign]} bind:controller={y_neutrino} />
