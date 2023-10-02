@@ -448,9 +448,9 @@ pub fn submit_setup(
         &token_id
     )?;
 
-    if !valid_setup(&cells) {
-        return Err(StdError::generic_err("Not a valid battleship setup"));
-    }
+    // if !valid_setup(&cells) {
+    //     return Err(StdError::generic_err("Not a valid battleship setup"));
+    // }
 
     // check if game id exists
     let listed_game = LISTED_GAMES_STORE.get(deps.storage, &game_id);
@@ -493,7 +493,7 @@ pub fn submit_setup(
                     .add_suffix(game_id.as_bytes())
                     .save(deps.storage, &(first_mover_turn as u8))?;
             } else {
-                return Err(StdError::generic_err("Game state is not at submit setup"));
+                return Err(StdError::generic_err("You already submitted a setup"));
             }
 
             INITIATOR_HOME_STORE
@@ -529,7 +529,7 @@ pub fn submit_setup(
                     .add_suffix(game_id.as_bytes())
                     .save(deps.storage, &(first_mover_turn as u8))?;
             } else {
-                return Err(StdError::generic_err("Game state is not at submit setup"));
+                return Err(StdError::generic_err("You already submitted a setup"));
             }
 
             JOINER_HOME_STORE
