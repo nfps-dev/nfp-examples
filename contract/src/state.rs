@@ -289,47 +289,6 @@ pub fn store_mint(
     Ok(())
 }
 
-/// Returns StdResult<()> after storing tx
-///
-/// # Arguments
-///
-/// * `storage` - a mutable reference to the storage this item should go to
-/// * `config` - a mutable reference to the contract Config
-/// * `block` - a reference to the current BlockInfo
-/// * `token_id` - token id being minted
-/// * `owner` - the previous owner's address
-/// * `burner` - optional address that burnt the token
-/// * `memo` - optional memo for the tx
-pub fn store_burn(
-    storage: &mut dyn Storage,
-    config: &mut Config,
-    block: &BlockInfo,
-    token_id: String,
-    owner: CanonicalAddr,
-    burner: Option<CanonicalAddr>,
-    memo: Option<String>,
-) -> StdResult<()> {
-    let action = StoredTxAction::Burn { owner, burner };
-    let tx = StoredTx {
-        tx_id: config.tx_cnt,
-        block_height: block.height,
-        block_time: block.time.seconds(),
-        token_id,
-        action,
-        memo,
-    };
-    let mut tx_store = PrefixedStorage::new(storage, PREFIX_TXS);
-    json_save(&mut tx_store, &config.tx_cnt.to_le_bytes(), &tx)?;
-    if let StoredTxAction::Burn { owner, burner } = tx.action {
-        append_tx_for_addr(storage, config.tx_cnt, &owner)?;
-        if let Some(bnr) = burner.as_ref() {
-            append_tx_for_addr(storage, config.tx_cnt, bnr)?;
-        }
-    }
-    config.tx_cnt += 1;
-    Ok(())
-}
-
 /// Returns StdResult<()> after saving tx id
 ///
 /// # Arguments

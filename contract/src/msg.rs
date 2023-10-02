@@ -152,21 +152,6 @@ pub enum ExecuteMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// set royalty information.  If no token ID is provided, this royalty info will become the default
-    /// RoyaltyInfo for any new tokens minted on the contract.  If a token ID is provided, this can only
-    /// be called by the token creator and only when the creator is the current owner.  Royalties can not
-    /// be set on a token that is not transferable, because they can never be sold
-    SetRoyaltyInfo {
-        /// optional id of the token whose royalty information should be updated.  If not provided,
-        /// this updates the default royalty information for any new tokens minted on the contract
-        token_id: Option<String>,
-        /// the new royalty information.  If None, existing royalty information will be deleted.  It should
-        /// be noted, that if deleting a token's royalty information while the contract has a default royalty
-        /// info set up will give the token the default royalty information
-        royalty_info: Option<RoyaltyInfo>,
-        /// optional message length padding
-        padding: Option<String>,
-    },
     /// if a contract was instantiated to make ownership public by default, this will allow
     /// an address to make the ownership of their tokens private.  The address can still use
     /// SetGlobalApproval to make ownership public either inventory-wide or for a specific token
@@ -286,17 +271,6 @@ pub enum ExecuteMsg {
     BatchSendNft {
         /// list of sends to perform
         sends: Vec<Send>,
-        /// optional message length padding
-        padding: Option<String>,
-    },
-    /// burn a token.  This can be always be done on a non-transferable token, regardless of whether burn
-    /// has been enabled on the contract.  An owner should always have a way to get rid of a token they do
-    /// not want, and burning is the only way to do that if the token is non-transferable
-    BurnNft {
-        /// token to burn
-        token_id: String,
-        /// optional memo for the tx
-        memo: Option<String>,
         /// optional message length padding
         padding: Option<String>,
     },
@@ -554,15 +528,6 @@ pub struct Mint {
     pub memo: Option<String>,
 }
 
-/// token burn info used when doing a BatchBurnNft
-#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
-pub struct Burn {
-    /// tokens being burnt
-    pub token_ids: Vec<String>,
-    /// optional memo for the tx
-    pub memo: Option<String>,
-}
-
 /// token transfer info used when doing a BatchTransferNft
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct Transfer {
@@ -609,9 +574,6 @@ pub enum ExecuteAnswer {
     SetMetadata {
         status: ResponseStatus,
     },
-    SetRoyaltyInfo {
-        status: ResponseStatus,
-    },
     MakeOwnershipPrivate {
         status: ResponseStatus,
     },
@@ -643,9 +605,6 @@ pub enum ExecuteAnswer {
         status: ResponseStatus,
     },
     BatchSendNft {
-        status: ResponseStatus,
-    },
-    BurnNft {
         status: ResponseStatus,
     },
     RegisterReceiveNft {
@@ -945,10 +904,6 @@ pub enum QueryMsg {
         /// optional viewing key
         viewing_key: Option<String>,
     },
-    /// display if a token is unwrapped
-    IsUnwrapped { token_id: String },
-    /// display if a token is transferable
-    IsTransferable { token_id: String },
     /// verify that the specified address has approval to transfer every listed token.
     /// A token will count as unapproved if it is non-transferable
     VerifyTransferApproval {
@@ -975,15 +930,6 @@ pub enum QueryMsg {
     RegisteredCodeHash {
         /// the contract whose receive registration info you want to view
         contract: String,
-    },
-    /// display the royalty information of a token if a token ID is specified, or display the
-    /// contract's default royalty information in no token ID is provided
-    RoyaltyInfo {
-        /// optional ID of the token whose royalty information should be displayed.  If not
-        /// provided, display the contract's default royalty information
-        token_id: Option<String>,
-        /// optional address and key requesting to view the royalty information
-        viewer: Option<ViewerInfo>,
     },
     /// display the contract's creator
     ContractCreator {},
@@ -1251,12 +1197,6 @@ pub enum QueryAnswer {
     ApprovedForAll {
         operators: Vec<Cw721Approval>,
     },
-    IsUnwrapped {
-        token_is_unwrapped: bool,
-    },
-    IsTransferable {
-        token_is_transferable: bool,
-    },
     VerifyTransferApproval {
         approved_for_all: bool,
         first_unapproved_token: Option<String>,
@@ -1269,9 +1209,6 @@ pub enum QueryAnswer {
     RegisteredCodeHash {
         code_hash: Option<String>,
         also_implements_batch_receive_nft: bool,
-    },
-    RoyaltyInfo {
-        royalty_info: Option<DisplayRoyaltyInfo>,
     },
     ContractCreator {
         creator: Option<Addr>,
@@ -1365,13 +1302,6 @@ impl ContractStatus {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryWithPermit {
-    /// display the royalty information of a token if a token ID is specified, or display the
-    /// contract's default royalty information in no token ID is provided
-    RoyaltyInfo {
-        /// optional ID of the token whose royalty information should be displayed.  If not
-        /// provided, display the contract's default royalty information
-        token_id: Option<String>,
-    },
     /// displays the private metadata if permitted to view it
     PrivateMetadata { token_id: String },
     /// displays all the information about a token that the viewer has permission to

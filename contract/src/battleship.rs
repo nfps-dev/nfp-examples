@@ -1442,17 +1442,15 @@ mod tests {
 
     use cosmwasm_std::{testing::*, Coin, Uint128};
     use cosmwasm_std::{
-        from_binary, to_binary, Addr, Api, Binary, OwnedDeps,
+        from_binary, Binary, OwnedDeps,
         Response, StdError, StdResult,
     };
-    use crate::contract::{execute, instantiate, query,};
+    use crate::battleship::valid_setup;
+    use crate::contract::{execute, instantiate,};
     use crate::msg::{
-        ContractStatus, ExecuteAnswer, ExecuteMsg, InstantiateConfig,
-        InstantiateMsg, Mint, QueryAnswer, QueryMsg,
-        KeyValuePair, ViewerInfo, ViewerInfoAddrOpt,
+        ExecuteAnswer, ExecuteMsg, InstantiateConfig,
+        InstantiateMsg, 
     };
-    use crate::nfp::{RawData, KEY_CLEARED_PACKAGES};
-    use crate::token::{Extension, Metadata,};
 
     // Helper functions
 
@@ -1581,7 +1579,17 @@ mod tests {
     #[test]
     fn test_valid_setup() {
         let setup: Vec<u8> = vec![
-
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
         ];
+        assert!(valid_setup(&setup));
     }
 }
