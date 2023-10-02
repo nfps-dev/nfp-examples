@@ -624,7 +624,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             signed_doc
         ),
     };
-    pad_handle_result(response, BLOCK_SIZE)
+    // pad_handle_result(response, BLOCK_SIZE)
+    response
 }
 
 /// Returns StdResult<Response>
