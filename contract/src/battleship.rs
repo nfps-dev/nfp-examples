@@ -114,63 +114,128 @@ fn valid_setup(
         return false; // The board should have exactly 100 cells.
     }
 
-    let mut counts = [0; 6]; // Count of each ship type and empty cells.
+    let mut matched = vec![false; BOARD_SIZE];
+    let mut carrier_found = false;
+    let mut battleship_found = false;
+    let mut cruiser_found = false;
+    let mut submarine_found = false;
+    let mut destroyer_found = false;
 
-    // Check for each ship type and count the occurrences.
-    for cell in cells {
-        match *cell {
-            2 => counts[0] += 1, // Carrier
-            3 => counts[1] += 1, // Battleship
-            4 => counts[2] += 1, // Cruiser
-            5 => counts[3] += 1, // Submarine
-            6 => counts[4] += 1, // Destroyer
-            0 => counts[5] += 1, // Empty cell
-            _ => return false,   // Invalid cell value
-        }
-    }
-
-    // Check if the counts of each ship type are valid.
-    if counts[0] != CARRIER_SIZE || 
-       counts[1] != BATTLESHIP_SIZE || 
-       counts[2] != CRUISER_SIZE || 
-       counts[3] != SUBMARINE_SIZE || 
-       counts[4] != DESTROYER_SIZE || 
-       counts[5] != BOARD_SIZE as u8 - CARRIER_SIZE - BATTLESHIP_SIZE - CRUISER_SIZE - SUBMARINE_SIZE - DESTROYER_SIZE {
-        return false;
-    }
-
-    // Check if the ships are adjacent in a straight line.
-    for ship_type in 0..5 {
-        let mut found_start = false;
-
-        for (i, cell) in cells.iter().enumerate() {
-            if *cell == ship_type {
-                if found_start {
-                    return false; // Ship cells are not adjacent.
-                }
-                found_start = true;
-
-                // Check horizontally
-                if i % 10 < 10 - counts[ship_type as usize] as usize {
-                    for j in 0..counts[ship_type as usize] as usize {
-                        if cells[i + j] as u8 != ship_type {
-                            return false; // Ship cells are not in a straight line.
+    for (i, cell) in cells.iter().enumerate() {
+        if !matched[i] {
+            if *cell != CellValue::Empty as u8 {
+                if *cell == CellValue::Carrier as u8 {
+                    let carrier_size = CARRIER_SIZE as usize;
+                    // check horiz
+                    if i % 10 <= 10 - carrier_size && 
+                       cells[i..i+carrier_size] == vec![CellValue::Carrier as u8; carrier_size] {
+                        for j in 0..carrier_size {
+                            matched[i+j] = true;
                         }
+                        carrier_found = true;
                     }
-                }
-
-                // Check vertically
-                if i / 10 < 10 - counts[ship_type as usize] as usize {
-                    for j in 0..counts[ship_type as usize] as usize {
-                        if cells[i + j * 10] as u8 != ship_type {
-                            return false; // Ship cells are not in a straight line.
+                    // check vert
+                    if !carrier_found && 
+                       i / 10 <= 10 - carrier_size &&
+                       vec![cells[i], cells[i+10], cells[i+20], cells[i+30], cells[i+40]] == vec![CellValue::Carrier as u8; carrier_size] {
+                        for j in 0..carrier_size {
+                            matched[i+(j*10)] = true;
                         }
+                        carrier_found = true;
                     }
+                    if !carrier_found { return false };
+                } else if *cell == CellValue::Battleship as u8 {
+                    let battleship_size = BATTLESHIP_SIZE as usize;
+                    // check horiz
+                    if i % 10 <= 10 - battleship_size && 
+                       cells[i..i+battleship_size] == vec![CellValue::Battleship as u8; battleship_size] {
+                        for j in 0..battleship_size {
+                            matched[i+j] = true;
+                        }
+                        battleship_found = true;
+                    }
+                    // check vert
+                    if !battleship_found && 
+                       i / 10 <= 10 - battleship_size &&
+                       vec![cells[i], cells[i+10], cells[i+20], cells[i+30]] == vec![CellValue::Battleship as u8; battleship_size] {
+                        for j in 0..battleship_size {
+                            matched[i+(j*10)] = true;
+                        }
+                        battleship_found = true;
+                    }
+                    if !battleship_found { return false };
+                } else if *cell == CellValue::Cruiser as u8 {
+                    let cruiser_size = CRUISER_SIZE as usize;
+                    // check horiz
+                    if i % 10 <= 10 - cruiser_size && 
+                       cells[i..i+cruiser_size] == vec![CellValue::Cruiser as u8; cruiser_size] {
+                        for j in 0..cruiser_size {
+                            matched[i+j] = true;
+                        }
+                        cruiser_found = true;
+                    }
+                    // check vert
+                    if !cruiser_found && 
+                       i / 10 <= 10 - cruiser_size &&
+                       vec![cells[i], cells[i+10], cells[i+20]] == vec![CellValue::Cruiser as u8; cruiser_size] {
+                        for j in 0..cruiser_size {
+                            matched[i+(j*10)] = true;
+                        }
+                        cruiser_found = true;
+                    }
+                    if !cruiser_found { return false };
+                } else if *cell == CellValue::Submarine as u8 {
+                    let submarine_size = SUBMARINE_SIZE as usize;
+                    // check horiz
+                    if i % 10 <= 10 - submarine_size && 
+                       cells[i..i+submarine_size] == vec![CellValue::Submarine as u8; submarine_size] {
+                        for j in 0..submarine_size {
+                            matched[i+j] = true;
+                        }
+                        submarine_found = true;
+                    }
+                    // check vert
+                    if !submarine_found && 
+                       i / 10 <= 10 - submarine_size &&
+                       vec![cells[i], cells[i+10], cells[i+20]] == vec![CellValue::Submarine as u8; submarine_size] {
+                        for j in 0..submarine_size {
+                            matched[i+(j*10)] = true;
+                        }
+                        submarine_found = true;
+                    }
+                    if !submarine_found { return false };
+                } else if *cell == CellValue::Destroyer as u8 {
+                    let destroyer_size = DESTROYER_SIZE as usize;
+                    // check horiz
+                    if i % 10 <= 10 - destroyer_size && 
+                       cells[i..i+destroyer_size] == vec![CellValue::Destroyer as u8; destroyer_size] {
+                        for j in 0..destroyer_size {
+                            matched[i+j] = true;
+                        }
+                        destroyer_found = true;
+                    }
+                    // check vert
+                    if !destroyer_found && 
+                       i / 10 <= 10 - destroyer_size &&
+                       vec![cells[i], cells[i+10], cells[i+20]] == vec![CellValue::Destroyer as u8; destroyer_size] {
+                        for j in 0..destroyer_size {
+                            matched[i+(j*10)] = true;
+                        }
+                        destroyer_found = true;
+                    }
+                    if !destroyer_found { return false };
+                } else {
+                    return false;
                 }
+            } else {
+                matched[i] = true;
             }
         }
     }
 
+    if !(carrier_found && battleship_found && cruiser_found && submarine_found && destroyer_found) {
+        return false;
+    }
     true
 }
 
@@ -448,9 +513,9 @@ pub fn submit_setup(
         &token_id
     )?;
 
-    // if !valid_setup(&cells) {
-    //     return Err(StdError::generic_err("Not a valid battleship setup"));
-    // }
+    if !valid_setup(&cells) {
+        return Err(StdError::generic_err("Not a valid battleship setup"));
+    }
 
     // check if game id exists
     let listed_game = LISTED_GAMES_STORE.get(deps.storage, &game_id);

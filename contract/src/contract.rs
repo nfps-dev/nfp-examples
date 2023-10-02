@@ -43,7 +43,7 @@ use crate::state::{
     get_txs, json_may_load, json_save, load, may_load, remove, save, store_burn, store_mint,
     store_transfer, AuthList, Config, Permission, PermissionType, ReceiveRegistration, CONFIG_KEY,
     CREATOR_KEY, DEFAULT_ROYALTY_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST,
-    PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_MINT_RUN, PREFIX_MINT_RUN_NUM,
+    PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_MINT_RUN,
     PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_REVOKED_PERMITS,
     PREFIX_ROYALTY_INFO, VIEWING_KEY_ERR_MSG, 
 };
@@ -219,37 +219,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             transferable,
             memo,
         ),
-        ExecuteMsg::BatchMintNft { mints, .. } => batch_mint(
-            deps,
-            &env,
-            &info.sender,
-            &mut config,
-            ContractStatus::Normal.to_u8(),
-            mints,
-        ),
-        ExecuteMsg::MintNftClones {
-            mint_run_id,
-            quantity,
-            owner,
-            public_metadata,
-            private_metadata,
-            royalty_info,
-            memo,
-            ..
-        } => mint_clones(
-            deps,
-            &env,
-            &info.sender,
-            &mut config,
-            ContractStatus::Normal.to_u8(),
-            mint_run_id.as_ref(),
-            quantity,
-            owner,
-            public_metadata,
-            private_metadata,
-            royalty_info,
-            memo,
-        ),
         ExecuteMsg::SetMetadata {
             token_id,
             public_metadata,
@@ -275,13 +244,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             ContractStatus::StopTransactions.to_u8(),
             token_id.as_deref(),
             royalty_info.as_ref(),
-        ),
-        ExecuteMsg::Reveal { token_id, .. } => reveal(
-            deps,
-            &info.sender,
-            &config,
-            ContractStatus::StopTransactions.to_u8(),
-            &token_id,
         ),
         ExecuteMsg::MakeOwnershipPrivate { .. } => make_owner_private(
             deps,
@@ -457,14 +419,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             ContractStatus::Normal.to_u8(),
             token_id,
             memo,
-        ),
-        ExecuteMsg::BatchBurnNft { burns, .. } => batch_burn_nft(
-            deps,
-            &env,
-            &info.sender,
-            &mut config,
-            ContractStatus::Normal.to_u8(),
-            burns,
         ),
         ExecuteMsg::CreateViewingKey { entropy, .. } => create_key(
             deps,
@@ -691,141 +645,6 @@ pub fn mint(
 
 /// Returns StdResult<Response>
 ///
-/// mints many tokens
-///
-/// # Arguments
-///
-/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - a reference to the Env of contract's environment
-/// * `sender` - a reference to the message sender address
-/// * `config` - a mutable reference to the Config
-/// * `priority` - u8 representation of highest ContractStatus level this action is permitted
-/// * `mints` - the list of mints to perform
-pub fn batch_mint(
-    deps: DepsMut,
-    env: &Env,
-    sender: &Addr,
-    config: &mut Config,
-    priority: u8,
-    mints: Vec<Mint>,
-) -> StdResult<Response> {
-    check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
-    if !minters.contains(&sender_raw) {
-        return Err(StdError::generic_err(
-            "Only designated minters are allowed to mint",
-        ));
-    }
-    let minted = mint_list(deps, env, config, &sender_raw, mints)?;
-    Ok(Response::new()
-        .add_attributes(vec![attr("minted", format!("{:?}", &minted))])
-        .set_data(to_binary(&ExecuteAnswer::BatchMintNft {
-            token_ids: minted,
-        })?))
-}
-
-/// Returns StdResult<Response>
-///
-/// mints clones of a token
-///
-/// # Arguments
-///
-/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - a reference to the Env of contract's environment
-/// * `sender` - a reference to the message sender address
-/// * `config` - a mutable reference to the Config
-/// * `priority` - u8 representation of highest status level this action is permitted at
-/// * `mint_run_id` - optional id used to track subsequent mint runs
-/// * `quantity` - number of clones to mint
-/// * `owner` - optional owner of this token, if not specified, use the minter's address
-/// * `public_metadata` - optional public metadata viewable by everyone
-/// * `private_metadata` - optional private metadata viewable only by owner and whitelist
-/// * `royalty_info` - optional royalties information for these clones
-/// * `memo` - optional memo for the mint txs
-#[allow(clippy::too_many_arguments)]
-pub fn mint_clones(
-    deps: DepsMut,
-    env: &Env,
-    sender: &Addr,
-    config: &mut Config,
-    priority: u8,
-    mint_run_id: Option<&String>,
-    quantity: u32,
-    owner: Option<String>,
-    public_metadata: Option<Metadata>,
-    private_metadata: Option<Metadata>,
-    royalty_info: Option<RoyaltyInfo>,
-    memo: Option<String>,
-) -> StdResult<Response> {
-    check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
-    if !minters.contains(&sender_raw) {
-        return Err(StdError::generic_err(
-            "Only designated minters are allowed to mint",
-        ));
-    }
-    if quantity == 0 {
-        return Err(StdError::generic_err("Quantity can not be zero"));
-    }
-    let mint_run = mint_run_id
-        .map(|i| {
-            let key = i.as_bytes();
-            let mut run_store = PrefixedStorage::new(deps.storage, PREFIX_MINT_RUN_NUM);
-            let last_num: u32 = may_load(&run_store, key)?.unwrap_or(0);
-            let this_num: u32 = last_num.checked_add(1).ok_or_else(|| {
-                StdError::generic_err(format!(
-                    "Mint run ID {} has already reached its maximum possible value",
-                    i
-                ))
-            })?;
-            save(&mut run_store, key, &this_num)?;
-            Ok::<u32, StdError>(this_num)
-        })
-        .transpose()?;
-    let mut serial_number = SerialNumber {
-        mint_run,
-        serial_number: 1,
-        quantity_minted_this_run: Some(quantity),
-    };
-    let mut mints: Vec<Mint> = Vec::new();
-    for _ in 0..quantity {
-        mints.push(Mint {
-            token_id: None,
-            owner: owner.clone(),
-            public_metadata: public_metadata.clone(),
-            private_metadata: private_metadata.clone(),
-            serial_number: Some(serial_number.clone()),
-            royalty_info: royalty_info.clone(),
-            transferable: Some(true),
-            memo: memo.clone(),
-        });
-        serial_number.serial_number += 1;
-    }
-    let mut minted = mint_list(deps, env, config, &sender_raw, mints)?;
-    // if mint_list did not error, there must be at least one token id
-    let first_minted = minted
-        .first()
-        .ok_or_else(|| StdError::generic_err("List of minted tokens is empty"))?
-        .clone();
-    let last_minted = minted
-        .pop()
-        .ok_or_else(|| StdError::generic_err("List of minted tokens is empty"))?;
-
-    Ok(Response::new()
-        .add_attributes(vec![
-            attr("first_minted", &first_minted),
-            attr("last_minted", &last_minted),
-        ])
-        .set_data(to_binary(&ExecuteAnswer::MintNftClones {
-            first_minted,
-            last_minted,
-        })?))
-}
-
-/// Returns StdResult<Response>
-///
 /// sets new public and/or private metadata
 ///
 /// # Arguments
@@ -951,64 +770,6 @@ pub fn set_royalty_info(
             status: Success,
         })?),
     )
-}
-
-/// Returns StdResult<Response>
-///
-/// makes the sealed private metadata public
-///
-/// # Arguments
-///
-/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `sender` - a reference to the message sender address
-/// * `config` - a reference to the Config
-/// * `priority` - u8 representation of highest status level this action is permitted at
-/// * `token_id` - token id String slice of token whose metadata should be updated
-pub fn reveal(
-    deps: DepsMut,
-    sender: &Addr,
-    config: &Config,
-    priority: u8,
-    token_id: &str,
-) -> StdResult<Response> {
-    check_status(config.status, priority)?;
-    if !config.sealed_metadata_is_enabled {
-        return Err(StdError::generic_err(
-            "Sealed metadata functionality is not enabled for this contract",
-        ));
-    }
-    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    let custom_err = format!("You do not own token {}", token_id);
-    // if token supply is private, don't leak that the token id does not exist
-    // instead just say they do not own that token
-    let opt_err = if config.token_supply_is_public {
-        None
-    } else {
-        Some(&*custom_err)
-    };
-    let (mut token, idx) = get_token(deps.storage, token_id, opt_err)?;
-    if token.unwrapped {
-        return Err(StdError::generic_err(
-            "This token has already been unwrapped",
-        ));
-    }
-    if token.owner != sender_raw {
-        return Err(StdError::generic_err(custom_err));
-    }
-    token.unwrapped = true;
-    let token_key = idx.to_le_bytes();
-    let mut info_store = PrefixedStorage::new(deps.storage, PREFIX_INFOS);
-    json_save(&mut info_store, &token_key, &token)?;
-    if !config.unwrap_to_private {
-        let mut priv_store = PrefixedStorage::new(deps.storage, PREFIX_PRIV_META);
-        let may_priv: Option<Metadata> = may_load(&priv_store, &token_key)?;
-        if let Some(metadata) = may_priv {
-            remove(&mut priv_store, &token_key);
-            let mut pub_store = PrefixedStorage::new(deps.storage, PREFIX_PUB_META);
-            save(&mut pub_store, &token_key, &metadata)?;
-        }
-    }
-    Ok(Response::new().set_data(to_binary(&ExecuteAnswer::Reveal { status: Success })?))
 }
 
 /// Returns StdResult<Response>
@@ -1322,34 +1083,6 @@ pub fn set_whitelisted_approval(
         SetAppResp::RevokeAll => ExecuteAnswer::RevokeAll { status: Success },
     };
     let res = Response::new().set_data(to_binary(&response)?);
-    Ok(res)
-}
-
-/// Returns StdResult<Response>
-///
-/// burns many tokens
-///
-/// # Arguments
-///
-/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - a reference to the Env of contract's environment
-/// * `sender` - a reference to the message sender address
-/// * `config` - a mutable reference to the Config
-/// * `priority` - u8 representation of highest ContractStatus level this action is permitted
-/// * `burns` - the list of burns to perform
-pub fn batch_burn_nft(
-    deps: DepsMut,
-    env: &Env,
-    sender: &Addr,
-    config: &mut Config,
-    priority: u8,
-    burns: Vec<Burn>,
-) -> StdResult<Response> {
-    check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    burn_list(deps, &env.block, config, &sender_raw, burns)?;
-    let res =
-        Response::new().set_data(to_binary(&ExecuteAnswer::BatchBurnNft { status: Success })?);
     Ok(res)
 }
 
@@ -2351,12 +2084,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
         QueryMsg::IsUnwrapped { token_id } => query_is_unwrapped(deps.storage, &token_id),
         QueryMsg::IsTransferable { token_id } => query_is_transferable(deps.storage, &token_id),
-        QueryMsg::ImplementsNonTransferableTokens {} => {
-            to_binary(&QueryAnswer::ImplementsNonTransferableTokens { is_enabled: true })
-        }
-        QueryMsg::ImplementsTokenSubtype {} => {
-            to_binary(&QueryAnswer::ImplementsTokenSubtype { is_enabled: true })
-        }
         QueryMsg::TransactionHistory {
             address,
             viewing_key,
