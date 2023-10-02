@@ -1312,7 +1312,7 @@ pub fn query_game_state(
 
     to_binary(&QueryAnswer::GameState { 
         role: role as u8, 
-        state: turn, 
+        turn: turn, 
         home, 
         away,
         game_id,

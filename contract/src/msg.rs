@@ -1400,7 +1400,7 @@ pub enum QueryAnswer {
         created: Timestamp,
         // 
         role: u8,
-        state: u8,
+        turn: u8,
         home: Vec<u8>,
         away: Vec<u8>,
     },
