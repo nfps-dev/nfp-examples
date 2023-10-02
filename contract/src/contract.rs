@@ -239,23 +239,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             &config,
             ContractStatus::StopTransactions.to_u8(),
         ),
-        ExecuteMsg::SetGlobalApproval {
-            token_id,
-            view_owner,
-            view_private_metadata,
-            expires,
-            ..
-        } => set_global_approval(
-            deps,
-            &env,
-            &info.sender,
-            &config,
-            ContractStatus::StopTransactions.to_u8(),
-            token_id,
-            view_owner,
-            view_private_metadata,
-            expires,
-        ),
         ExecuteMsg::SetWhitelistedApproval {
             address,
             token_id,
@@ -796,92 +779,6 @@ pub fn make_owner_private(
     }
     Ok(
         Response::new().set_data(to_binary(&ExecuteAnswer::MakeOwnershipPrivate {
-            status: Success,
-        })?),
-    )
-}
-
-/// Returns StdResult<Response>
-///
-/// adds/revokes access for everyone
-///
-/// # Arguments
-///
-/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - a reference to the Env of contract's environment
-/// * `sender` - a reference to the message sender address
-/// * `config` - a reference to the Config
-/// * `priority` - u8 representation of highest status level this action is permitted at
-/// * `token_id` - optional token id to apply approvals to
-/// * `view_owner` - optional access level for viewing token ownership
-/// * `view_private_metadata` - optional access level for viewing private metadata
-/// * `expires` - optional Expiration for this approval
-#[allow(clippy::too_many_arguments)]
-pub fn set_global_approval(
-    deps: DepsMut,
-    env: &Env,
-    sender: &Addr,
-    config: &Config,
-    priority: u8,
-    token_id: Option<String>,
-    view_owner: Option<AccessLevel>,
-    view_private_metadata: Option<AccessLevel>,
-    expires: Option<Expiration>,
-) -> StdResult<Response> {
-    check_status(config.status, priority)?;
-    let token_given: bool;
-    // use this "address" to represent global permission
-    let global_raw = CanonicalAddr(Binary::from(b"public"));
-    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    let mut custom_err = String::new();
-    let (token, idx) = if let Some(id) = token_id {
-        token_given = true;
-        custom_err = format!("You do not own token {}", id);
-        // if token supply is private, don't leak that the token id does not exist
-        // instead just say they do not own that token
-        let opt_err = if config.token_supply_is_public {
-            None
-        } else {
-            Some(&*custom_err)
-        };
-        get_token(deps.storage, &id, opt_err)?
-    } else {
-        token_given = false;
-        (
-            Token {
-                owner: sender_raw.clone(),
-                permissions: Vec::new(),
-                unwrapped: false,
-                transferable: true,
-            },
-            0,
-        )
-    };
-    // if trying to set token permissions when you are not the owner
-    if token_given && token.owner != sender_raw {
-        return Err(StdError::generic_err(custom_err));
-    }
-    let mut accesses: [Option<AccessLevel>; 3] = [None, None, None];
-    accesses[PermissionType::ViewOwner.to_usize()] = view_owner;
-    accesses[PermissionType::ViewMetadata.to_usize()] = view_private_metadata;
-    let mut proc_info = ProcessAccInfo {
-        token,
-        idx,
-        token_given,
-        accesses,
-        expires,
-        from_oper: false,
-    };
-    process_accesses(
-        deps.storage,
-        env,
-        &global_raw,
-        &sender_raw,
-        &mut proc_info,
-        None,
-    )?;
-    Ok(
-        Response::new().set_data(to_binary(&ExecuteAnswer::SetGlobalApproval {
             status: Success,
         })?),
     )

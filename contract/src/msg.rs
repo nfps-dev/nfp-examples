@@ -159,19 +159,6 @@ pub enum ExecuteMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// add/remove approval(s) that whitelist everyone (makes public)
-    SetGlobalApproval {
-        /// optional token id to apply approval/revocation to
-        token_id: Option<String>,
-        /// optional permission level for viewing the owner
-        view_owner: Option<AccessLevel>,
-        /// optional permission level for viewing private metadata
-        view_private_metadata: Option<AccessLevel>,
-        /// optional expiration
-        expires: Option<Expiration>,
-        /// optional message length padding
-        padding: Option<String>,
-    },
     /// add/remove approval(s) for a specific address on the token(s) you own.  Any permissions
     /// that are omitted will keep the current permission setting for that whitelist address
     SetWhitelistedApproval {
@@ -587,9 +574,6 @@ pub enum ExecuteAnswer {
         status: ResponseStatus,
     },
     RevokeAll {
-        status: ResponseStatus,
-    },
-    SetGlobalApproval {
         status: ResponseStatus,
     },
     SetWhitelistedApproval {
