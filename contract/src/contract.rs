@@ -1831,17 +1831,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             viewing_key.as_deref(),
             None,
         ),
-        QueryMsg::VerifyTransferApproval {
-            token_ids,
-            address,
-            viewing_key,
-        } => {
-            let viewer = Some(ViewerInfo {
-                address,
-                viewing_key,
-            });
-            query_verify_approval(deps, &env.block, token_ids, viewer, None)
-        }
         QueryMsg::TransactionHistory {
             address,
             viewing_key,
@@ -2023,9 +2012,6 @@ pub fn permit_queries(
         } => query_all_nft_info(deps, block, &token_id, None, include_expired, Some(querier)),
         QueryWithPermit::InventoryApprovals { include_expired } => {
             query_inventory_approvals(deps, block, None, include_expired, Some(querier))
-        }
-        QueryWithPermit::VerifyTransferApproval { token_ids } => {
-            query_verify_approval(deps, block, token_ids, None, Some(querier))
         }
         QueryWithPermit::TransactionHistory { page, page_size } => {
             query_transactions(deps, None, page, page_size, Some(querier))
@@ -2991,63 +2977,6 @@ pub fn query_transactions(
         page_size.unwrap_or(30),
     )?;
     to_binary(&QueryAnswer::TransactionHistory { total, txs })
-}
-
-/// Returns StdResult<Binary> after verifying that the specified address has transfer approval
-/// for all the listed tokens.  A token will count as unapproved if it is non-transferable
-///
-/// # Arguments
-///
-/// * `deps` - a reference to Extern containing all the contract's external dependencies
-/// * `block` - a reference to the BlockInfo
-/// * `token_ids` - a list of token ids to check if the address has transfer approval
-/// * `viewer` - optional address and key making an authenticated query request
-/// * `from_permit` - address derived from an Owner permit, if applicable
-pub fn query_verify_approval(
-    deps: Deps,
-    block: &BlockInfo,
-    token_ids: Vec<String>,
-    viewer: Option<ViewerInfo>,
-    from_permit: Option<CanonicalAddr>,
-) -> StdResult<Binary> {
-    let address_raw = get_querier(deps, viewer, from_permit)?.ok_or_else(|| {
-        StdError::generic_err("This is being called incorrectly if there is no querier address")
-    })?;
-    let config: Config = load(deps.storage, CONFIG_KEY)?;
-    let mut oper_for: Vec<CanonicalAddr> = Vec::new();
-    for id in token_ids.into_iter() {
-        // cargo fmt creates the and_then block, but clippy doesn't like it
-        #[allow(clippy::blocks_in_if_conditions)]
-        if get_token_if_permitted(
-            deps,
-            block,
-            &id,
-            Some(&address_raw),
-            PermissionType::Transfer,
-            &mut oper_for,
-            &config,
-            // the and_then forces an error if the token is not transferable
-        )
-        .and_then(|(t, _)| {
-            if t.transferable {
-                Ok(())
-            } else {
-                // the msg is never seen
-                Err(StdError::generic_err(""))
-            }
-        })
-        .is_err()
-        {
-            return to_binary(&QueryAnswer::VerifyTransferApproval {
-                approved_for_all: false,
-                first_unapproved_token: Some(id),
-            });
-        }
-    }
-    to_binary(&QueryAnswer::VerifyTransferApproval {
-        approved_for_all: true,
-        first_unapproved_token: None,
-    })
 }
 
 /// Returns StdResult<Binary> displaying the registered code hash of the specified contract if

@@ -889,16 +889,6 @@ pub enum QueryMsg {
         /// optional viewing key
         viewing_key: Option<String>,
     },
-    /// verify that the specified address has approval to transfer every listed token.
-    /// A token will count as unapproved if it is non-transferable
-    VerifyTransferApproval {
-        /// list of tokens to verify approval for
-        token_ids: Vec<String>,
-        /// address that has approval
-        address: String,
-        /// viewing key
-        viewing_key: String,
-    },
     /// display the transaction history for the specified address in reverse
     /// chronological order
     TransactionHistory {
@@ -1182,10 +1172,6 @@ pub enum QueryAnswer {
     ApprovedForAll {
         operators: Vec<Cw721Approval>,
     },
-    VerifyTransferApproval {
-        approved_for_all: bool,
-        first_unapproved_token: Option<String>,
-    },
     TransactionHistory {
         /// total transaction count
         total: u64,
@@ -1331,12 +1317,6 @@ pub enum QueryWithPermit {
         /// optionally include expired Approvals in the response list.  If ommitted or
         /// false, expired Approvals will be filtered out of the response
         include_expired: Option<bool>,
-    },
-    /// verify that the permit creator has approval to transfer every listed token.
-    /// A token will count as unapproved if it is non-transferable
-    VerifyTransferApproval {
-        /// list of tokens to verify approval for
-        token_ids: Vec<String>,
     },
     /// display the transaction history for the permit creator in reverse
     /// chronological order
