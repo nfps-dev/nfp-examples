@@ -9,7 +9,7 @@ use primitive_types::U256;
 use secret_toolkit::{
     crypto::sha_256,
     permit::{validate, Permit, RevokedPermits},
-    utils::{pad_handle_result, pad_query_result},
+    utils::pad_query_result,
     viewing_key::{ViewingKey, ViewingKeyStore}, serialization::{Json, Serde}, 
 };
 
@@ -32,7 +32,7 @@ use crate::nfp::{
 use crate::inventory::{Inventory, InventoryIter};
 use crate::mint_run::{SerialNumber, StoredMintRunInfo};
 use crate::msg::{
-    AccessLevel, BatchNftDossierElement, Burn, ContractStatus, Cw721Approval, Cw721OwnerOfResponse,
+    AccessLevel, BatchNftDossierElement, ContractStatus, Cw721Approval, Cw721OwnerOfResponse,
     ExecuteAnswer, ExecuteMsg, InstantiateMsg, Mint, QueryAnswer, QueryMsg, QueryWithPermit,
     ReceiverInfo, ResponseStatus::Success, Send, Snip721Approval, Transfer, ViewerInfo,
     KeyValuePair,
@@ -40,10 +40,10 @@ use crate::msg::{
 use crate::receiver::{batch_receive_nft_msg, receive_nft_msg};
 use crate::royalties::{RoyaltyInfo, StoredRoyaltyInfo};
 use crate::state::{
-    get_txs, json_may_load, json_save, load, may_load, remove, save, store_burn, store_mint,
+    get_txs, json_may_load, json_save, load, may_load, remove, save, store_mint,
     store_transfer, AuthList, Config, Permission, PermissionType, ReceiveRegistration, CONFIG_KEY,
     CREATOR_KEY, DEFAULT_ROYALTY_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST,
-    PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_MINT_RUN, PREFIX_MINT_RUN_NUM,
+    PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_MINT_RUN,
     PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_REVOKED_PERMITS,
     PREFIX_ROYALTY_INFO, VIEWING_KEY_ERR_MSG, 
 };
@@ -219,37 +219,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             transferable,
             memo,
         ),
-        ExecuteMsg::BatchMintNft { mints, .. } => batch_mint(
-            deps,
-            &env,
-            &info.sender,
-            &mut config,
-            ContractStatus::Normal.to_u8(),
-            mints,
-        ),
-        ExecuteMsg::MintNftClones {
-            mint_run_id,
-            quantity,
-            owner,
-            public_metadata,
-            private_metadata,
-            royalty_info,
-            memo,
-            ..
-        } => mint_clones(
-            deps,
-            &env,
-            &info.sender,
-            &mut config,
-            ContractStatus::Normal.to_u8(),
-            mint_run_id.as_ref(),
-            quantity,
-            owner,
-            public_metadata,
-            private_metadata,
-            royalty_info,
-            memo,
-        ),
         ExecuteMsg::SetMetadata {
             token_id,
             public_metadata,
@@ -263,25 +232,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             &token_id,
             public_metadata,
             private_metadata,
-        ),
-        ExecuteMsg::SetRoyaltyInfo {
-            token_id,
-            royalty_info,
-            ..
-        } => set_royalty_info(
-            deps,
-            &info.sender,
-            &config,
-            ContractStatus::StopTransactions.to_u8(),
-            token_id.as_deref(),
-            royalty_info.as_ref(),
-        ),
-        ExecuteMsg::Reveal { token_id, .. } => reveal(
-            deps,
-            &info.sender,
-            &config,
-            ContractStatus::StopTransactions.to_u8(),
-            &token_id,
         ),
         ExecuteMsg::MakeOwnershipPrivate { .. } => make_owner_private(
             deps,
@@ -449,23 +399,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             code_hash,
             also_implements_batch_receive_nft,
         ),
-        ExecuteMsg::BurnNft { token_id, memo, .. } => burn_nft(
-            deps,
-            &env,
-            &info.sender,
-            &mut config,
-            ContractStatus::Normal.to_u8(),
-            token_id,
-            memo,
-        ),
-        ExecuteMsg::BatchBurnNft { burns, .. } => batch_burn_nft(
-            deps,
-            &env,
-            &info.sender,
-            &mut config,
-            ContractStatus::Normal.to_u8(),
-            burns,
-        ),
         ExecuteMsg::CreateViewingKey { entropy, .. } => create_key(
             deps,
             &env,
@@ -624,8 +557,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             signed_doc
         ),
     };
-    // pad_handle_result(response, BLOCK_SIZE)
     response
+    //pad_handle_result(response, BLOCK_SIZE)
 }
 
 /// Returns StdResult<Response>
@@ -692,141 +625,6 @@ pub fn mint(
 
 /// Returns StdResult<Response>
 ///
-/// mints many tokens
-///
-/// # Arguments
-///
-/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - a reference to the Env of contract's environment
-/// * `sender` - a reference to the message sender address
-/// * `config` - a mutable reference to the Config
-/// * `priority` - u8 representation of highest ContractStatus level this action is permitted
-/// * `mints` - the list of mints to perform
-pub fn batch_mint(
-    deps: DepsMut,
-    env: &Env,
-    sender: &Addr,
-    config: &mut Config,
-    priority: u8,
-    mints: Vec<Mint>,
-) -> StdResult<Response> {
-    check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
-    if !minters.contains(&sender_raw) {
-        return Err(StdError::generic_err(
-            "Only designated minters are allowed to mint",
-        ));
-    }
-    let minted = mint_list(deps, env, config, &sender_raw, mints)?;
-    Ok(Response::new()
-        .add_attributes(vec![attr("minted", format!("{:?}", &minted))])
-        .set_data(to_binary(&ExecuteAnswer::BatchMintNft {
-            token_ids: minted,
-        })?))
-}
-
-/// Returns StdResult<Response>
-///
-/// mints clones of a token
-///
-/// # Arguments
-///
-/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - a reference to the Env of contract's environment
-/// * `sender` - a reference to the message sender address
-/// * `config` - a mutable reference to the Config
-/// * `priority` - u8 representation of highest status level this action is permitted at
-/// * `mint_run_id` - optional id used to track subsequent mint runs
-/// * `quantity` - number of clones to mint
-/// * `owner` - optional owner of this token, if not specified, use the minter's address
-/// * `public_metadata` - optional public metadata viewable by everyone
-/// * `private_metadata` - optional private metadata viewable only by owner and whitelist
-/// * `royalty_info` - optional royalties information for these clones
-/// * `memo` - optional memo for the mint txs
-#[allow(clippy::too_many_arguments)]
-pub fn mint_clones(
-    deps: DepsMut,
-    env: &Env,
-    sender: &Addr,
-    config: &mut Config,
-    priority: u8,
-    mint_run_id: Option<&String>,
-    quantity: u32,
-    owner: Option<String>,
-    public_metadata: Option<Metadata>,
-    private_metadata: Option<Metadata>,
-    royalty_info: Option<RoyaltyInfo>,
-    memo: Option<String>,
-) -> StdResult<Response> {
-    check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
-    if !minters.contains(&sender_raw) {
-        return Err(StdError::generic_err(
-            "Only designated minters are allowed to mint",
-        ));
-    }
-    if quantity == 0 {
-        return Err(StdError::generic_err("Quantity can not be zero"));
-    }
-    let mint_run = mint_run_id
-        .map(|i| {
-            let key = i.as_bytes();
-            let mut run_store = PrefixedStorage::new(deps.storage, PREFIX_MINT_RUN_NUM);
-            let last_num: u32 = may_load(&run_store, key)?.unwrap_or(0);
-            let this_num: u32 = last_num.checked_add(1).ok_or_else(|| {
-                StdError::generic_err(format!(
-                    "Mint run ID {} has already reached its maximum possible value",
-                    i
-                ))
-            })?;
-            save(&mut run_store, key, &this_num)?;
-            Ok::<u32, StdError>(this_num)
-        })
-        .transpose()?;
-    let mut serial_number = SerialNumber {
-        mint_run,
-        serial_number: 1,
-        quantity_minted_this_run: Some(quantity),
-    };
-    let mut mints: Vec<Mint> = Vec::new();
-    for _ in 0..quantity {
-        mints.push(Mint {
-            token_id: None,
-            owner: owner.clone(),
-            public_metadata: public_metadata.clone(),
-            private_metadata: private_metadata.clone(),
-            serial_number: Some(serial_number.clone()),
-            royalty_info: royalty_info.clone(),
-            transferable: Some(true),
-            memo: memo.clone(),
-        });
-        serial_number.serial_number += 1;
-    }
-    let mut minted = mint_list(deps, env, config, &sender_raw, mints)?;
-    // if mint_list did not error, there must be at least one token id
-    let first_minted = minted
-        .first()
-        .ok_or_else(|| StdError::generic_err("List of minted tokens is empty"))?
-        .clone();
-    let last_minted = minted
-        .pop()
-        .ok_or_else(|| StdError::generic_err("List of minted tokens is empty"))?;
-
-    Ok(Response::new()
-        .add_attributes(vec![
-            attr("first_minted", &first_minted),
-            attr("last_minted", &last_minted),
-        ])
-        .set_data(to_binary(&ExecuteAnswer::MintNftClones {
-            first_minted,
-            last_minted,
-        })?))
-}
-
-/// Returns StdResult<Response>
-///
 /// sets new public and/or private metadata
 ///
 /// # Arguments
@@ -871,145 +669,6 @@ pub fn set_metadata(
         set_metadata_impl(deps.storage, &token, idx, PREFIX_PRIV_META, &private)?;
     }
     Ok(Response::new().set_data(to_binary(&ExecuteAnswer::SetMetadata { status: Success })?))
-}
-
-/// Returns StdResult<Response>
-///
-/// sets new royalty information for a specified token or if no token ID is provided, sets new
-/// royalty information as the contract's default
-///
-/// # Arguments
-///
-/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `sender` - a reference to the message sender address
-/// * `config` - a reference to the Config
-/// * `priority` - u8 representation of highest status level this action is permitted at
-/// * `token_id` - optional token id String slice of token whose royalty info should be updated
-/// * `royalty_info` - a optional reference to the new RoyaltyInfo
-pub fn set_royalty_info(
-    deps: DepsMut,
-    sender: &Addr,
-    config: &Config,
-    priority: u8,
-    token_id: Option<&str>,
-    royalty_info: Option<&RoyaltyInfo>,
-) -> StdResult<Response> {
-    check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    // set a token's royalties
-    if let Some(id) = token_id {
-        let custom_err = "A token's RoyaltyInfo may only be set by the token creator when they are also the token owner";
-        // if token supply is private, don't leak that the token id does not exist
-        // instead just say they are not authorized for that token
-        let opt_err = if config.token_supply_is_public {
-            None
-        } else {
-            Some(custom_err)
-        };
-        let (token, idx) = get_token(deps.storage, id, opt_err)?;
-        if !token.transferable {
-            return Err(StdError::generic_err(
-                "Non-transferable tokens can not be sold, so royalties are meaningless",
-            ));
-        }
-        let token_key = idx.to_le_bytes();
-        let run_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_MINT_RUN);
-        let mint_run: StoredMintRunInfo = load(&run_store, &token_key)?;
-        if sender_raw != mint_run.token_creator || sender_raw != token.owner {
-            return Err(StdError::generic_err(custom_err));
-        }
-        let default_roy = royalty_info.as_ref().map_or_else(
-            || may_load::<StoredRoyaltyInfo>(deps.storage, DEFAULT_ROYALTY_KEY),
-            |_r| Ok(None),
-        )?;
-        let mut roy_store = PrefixedStorage::new(deps.storage, PREFIX_ROYALTY_INFO);
-        store_royalties(
-            &mut roy_store,
-            deps.api,
-            royalty_info,
-            default_roy.as_ref(),
-            &token_key,
-        )?;
-        // set default royalty
-    } else {
-        let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
-        if !minters.contains(&sender_raw) {
-            return Err(StdError::generic_err(
-                "Only designated minters can set default royalties for the contract",
-            ));
-        }
-        store_royalties(
-            deps.storage,
-            deps.api,
-            royalty_info,
-            None,
-            DEFAULT_ROYALTY_KEY,
-        )?;
-    };
-
-    Ok(
-        Response::new().set_data(to_binary(&ExecuteAnswer::SetRoyaltyInfo {
-            status: Success,
-        })?),
-    )
-}
-
-/// Returns StdResult<Response>
-///
-/// makes the sealed private metadata public
-///
-/// # Arguments
-///
-/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `sender` - a reference to the message sender address
-/// * `config` - a reference to the Config
-/// * `priority` - u8 representation of highest status level this action is permitted at
-/// * `token_id` - token id String slice of token whose metadata should be updated
-pub fn reveal(
-    deps: DepsMut,
-    sender: &Addr,
-    config: &Config,
-    priority: u8,
-    token_id: &str,
-) -> StdResult<Response> {
-    check_status(config.status, priority)?;
-    if !config.sealed_metadata_is_enabled {
-        return Err(StdError::generic_err(
-            "Sealed metadata functionality is not enabled for this contract",
-        ));
-    }
-    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    let custom_err = format!("You do not own token {}", token_id);
-    // if token supply is private, don't leak that the token id does not exist
-    // instead just say they do not own that token
-    let opt_err = if config.token_supply_is_public {
-        None
-    } else {
-        Some(&*custom_err)
-    };
-    let (mut token, idx) = get_token(deps.storage, token_id, opt_err)?;
-    if token.unwrapped {
-        return Err(StdError::generic_err(
-            "This token has already been unwrapped",
-        ));
-    }
-    if token.owner != sender_raw {
-        return Err(StdError::generic_err(custom_err));
-    }
-    token.unwrapped = true;
-    let token_key = idx.to_le_bytes();
-    let mut info_store = PrefixedStorage::new(deps.storage, PREFIX_INFOS);
-    json_save(&mut info_store, &token_key, &token)?;
-    if !config.unwrap_to_private {
-        let mut priv_store = PrefixedStorage::new(deps.storage, PREFIX_PRIV_META);
-        let may_priv: Option<Metadata> = may_load(&priv_store, &token_key)?;
-        if let Some(metadata) = may_priv {
-            remove(&mut priv_store, &token_key);
-            let mut pub_store = PrefixedStorage::new(deps.storage, PREFIX_PUB_META);
-            save(&mut pub_store, &token_key, &metadata)?;
-        }
-    }
-    Ok(Response::new().set_data(to_binary(&ExecuteAnswer::Reveal { status: Success })?))
 }
 
 /// Returns StdResult<Response>
@@ -1323,67 +982,6 @@ pub fn set_whitelisted_approval(
         SetAppResp::RevokeAll => ExecuteAnswer::RevokeAll { status: Success },
     };
     let res = Response::new().set_data(to_binary(&response)?);
-    Ok(res)
-}
-
-/// Returns StdResult<Response>
-///
-/// burns many tokens
-///
-/// # Arguments
-///
-/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - a reference to the Env of contract's environment
-/// * `sender` - a reference to the message sender address
-/// * `config` - a mutable reference to the Config
-/// * `priority` - u8 representation of highest ContractStatus level this action is permitted
-/// * `burns` - the list of burns to perform
-pub fn batch_burn_nft(
-    deps: DepsMut,
-    env: &Env,
-    sender: &Addr,
-    config: &mut Config,
-    priority: u8,
-    burns: Vec<Burn>,
-) -> StdResult<Response> {
-    check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    burn_list(deps, &env.block, config, &sender_raw, burns)?;
-    let res =
-        Response::new().set_data(to_binary(&ExecuteAnswer::BatchBurnNft { status: Success })?);
-    Ok(res)
-}
-
-/// Returns StdResult<Response>
-///
-/// burns a token
-///
-/// # Arguments
-///
-/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - a reference to the Env of contract's environment
-/// * `sender` - a reference to the message sender address
-/// * `config` - a mutable reference to the Config
-/// * `priority` - u8 representation of highest ContractStatus level this action is permitted
-/// * `token_id` - token id String of token to be burnt
-/// * `memo` - optional memo for the burn tx
-fn burn_nft(
-    deps: DepsMut,
-    env: &Env,
-    sender: &Addr,
-    config: &mut Config,
-    priority: u8,
-    token_id: String,
-    memo: Option<String>,
-) -> StdResult<Response> {
-    check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    let burns = vec![Burn {
-        token_ids: vec![token_id],
-        memo,
-    }];
-    burn_list(deps, &env.block, config, &sender_raw, burns)?;
-    let res = Response::new().set_data(to_binary(&ExecuteAnswer::BurnNft { status: Success })?);
     Ok(res)
 }
 
@@ -2241,9 +1839,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     let response = match msg {
         QueryMsg::ContractInfo {} => query_contract_info(deps.storage),
         QueryMsg::ContractCreator {} => query_contract_creator(deps),
-        QueryMsg::RoyaltyInfo { token_id, viewer } => {
-            query_royalty(deps, &env.block, token_id.as_deref(), viewer, None)
-        }
         QueryMsg::ContractConfig {} => query_config(deps.storage),
         QueryMsg::Minters {} => query_minters(deps),
         QueryMsg::NumTokens { viewer } => query_num_tokens(deps, viewer, None),
@@ -2349,14 +1944,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
                 viewing_key,
             });
             query_verify_approval(deps, &env.block, token_ids, viewer, None)
-        }
-        QueryMsg::IsUnwrapped { token_id } => query_is_unwrapped(deps.storage, &token_id),
-        QueryMsg::IsTransferable { token_id } => query_is_transferable(deps.storage, &token_id),
-        QueryMsg::ImplementsNonTransferableTokens {} => {
-            to_binary(&QueryAnswer::ImplementsNonTransferableTokens { is_enabled: true })
-        }
-        QueryMsg::ImplementsTokenSubtype {} => {
-            to_binary(&QueryAnswer::ImplementsTokenSubtype { is_enabled: true })
         }
         QueryMsg::TransactionHistory {
             address,
@@ -2518,9 +2105,6 @@ pub fn permit_queries(
     let block = &env.block;
     // permit validated, process query
     match query {
-        QueryWithPermit::RoyaltyInfo { token_id } => {
-            query_royalty(deps, block, token_id.as_deref(), None, Some(querier))
-        }
         QueryWithPermit::PrivateMetadata { token_id } => {
             query_private_meta(deps, block, &token_id, None, Some(querier))
         }
@@ -2633,77 +2217,6 @@ pub fn query_contract_info(storage: &dyn Storage) -> StdResult<Binary> {
     to_binary(&QueryAnswer::ContractInfo {
         name: config.name,
         symbol: config.symbol,
-    })
-}
-
-/// Returns StdResult<Binary> displaying either a token's royalty information or the contract's
-/// default royalty information if no token_id is specified
-///
-/// # Arguments
-///
-/// * `deps` - a reference to Extern containing all the contract's external dependencies
-/// * `block` - a reference to the BlockInfo
-/// * `token_id` - optional token id whose RoyaltyInfo is being requested
-/// * `viewer` - optional address and key making an authenticated query request
-/// * `from_permit` - address derived from an Owner permit, if applicable
-pub fn query_royalty(
-    deps: Deps,
-    block: &BlockInfo,
-    token_id: Option<&str>,
-    viewer: Option<ViewerInfo>,
-    from_permit: Option<CanonicalAddr>,
-) -> StdResult<Binary> {
-    let viewer_raw = get_querier(deps, viewer, from_permit)?;
-    let (royalty, hide_addr) = if let Some(id) = token_id {
-        // if the token id was found
-        if let Ok((token, idx)) = get_token(deps.storage, id, None) {
-            let hide_addr = check_perm_core(
-                deps,
-                block,
-                &token,
-                id,
-                viewer_raw.as_ref(),
-                token.owner.as_slice(),
-                PermissionType::Transfer.to_usize(),
-                &mut Vec::new(),
-                "",
-            )
-            .is_err();
-            // get the royalty information if present
-            let roy_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_ROYALTY_INFO);
-            (
-                may_load::<StoredRoyaltyInfo>(&roy_store, &idx.to_le_bytes())?,
-                hide_addr,
-            )
-            // token id not found
-        } else {
-            let config: Config = load(deps.storage, CONFIG_KEY)?;
-            let minters: Vec<CanonicalAddr> =
-                may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
-            let is_minter = viewer_raw.map(|v| minters.contains(&v)).unwrap_or(false);
-            // if minter querying or the token supply is public, let them know the token does not exist
-            if config.token_supply_is_public || is_minter {
-                return Err(StdError::generic_err(format!("Token ID: {} not found", id)));
-            }
-            // token supply is private and querier is not a minter so just show the default without addresses
-            (
-                may_load::<StoredRoyaltyInfo>(deps.storage, DEFAULT_ROYALTY_KEY)?,
-                true,
-            )
-        }
-        // no id specified, so get the default
-    } else {
-        let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
-        // only let minters view default royalty addresses
-        (
-            may_load::<StoredRoyaltyInfo>(deps.storage, DEFAULT_ROYALTY_KEY)?,
-            viewer_raw.map(|v| !minters.contains(&v)).unwrap_or(true),
-        )
-    };
-    to_binary(&QueryAnswer::RoyaltyInfo {
-        royalty_info: royalty
-            .map(|s| s.to_human(deps.api, hide_addr))
-            .transpose()?,
     })
 }
 
@@ -3550,61 +3063,6 @@ pub fn query_num_owner_tokens(
     }
 
     to_binary(&QueryAnswer::NumTokens { count })
-}
-
-/// Returns StdResult<Binary> displaying true if the token has been unwrapped.  If sealed metadata
-/// is not enabled, all tokens are considered unwrapped
-///
-/// # Arguments
-///
-/// * `storage` - a reference to the contract's storage
-pub fn query_is_unwrapped(storage: &dyn Storage, token_id: &str) -> StdResult<Binary> {
-    let config: Config = load(storage, CONFIG_KEY)?;
-    let get_token_res = get_token(storage, token_id, None);
-    match get_token_res {
-        Err(err) => match err {
-            // if the token id is not found, but token supply is private, just say
-            // the token's wrapped state is the same as a newly minted token
-            StdError::GenericErr { msg, .. }
-                if !config.token_supply_is_public && msg.contains("Token ID") =>
-            {
-                to_binary(&QueryAnswer::IsUnwrapped {
-                    token_is_unwrapped: !config.sealed_metadata_is_enabled,
-                })
-            }
-            _ => Err(err),
-        },
-        Ok((token, _idx)) => to_binary(&QueryAnswer::IsUnwrapped {
-            token_is_unwrapped: token.unwrapped,
-        }),
-    }
-}
-
-/// Returns StdResult<Binary> displaying true if the token is transferable
-///
-/// # Arguments
-///
-/// * `storage` - a reference to the contract's storage
-pub fn query_is_transferable(storage: &dyn Storage, token_id: &str) -> StdResult<Binary> {
-    let config: Config = load(storage, CONFIG_KEY)?;
-    let get_token_res = get_token(storage, token_id, None);
-    match get_token_res {
-        Err(err) => match err {
-            // if the token id is not found, but token supply is private, just say
-            // the token is transferable
-            StdError::GenericErr { msg, .. }
-                if !config.token_supply_is_public && msg.contains("Token ID") =>
-            {
-                to_binary(&QueryAnswer::IsTransferable {
-                    token_is_transferable: true,
-                })
-            }
-            _ => Err(err),
-        },
-        Ok((token, _idx)) => to_binary(&QueryAnswer::IsTransferable {
-            token_is_transferable: token.transferable,
-        }),
-    }
 }
 
 /// Returns StdResult<Binary> displaying an optionally paginated list of all transactions
@@ -5455,107 +4913,6 @@ fn send_list(
     save(deps.storage, CONFIG_KEY, &config)?;
     update_owner_inventory(deps.storage, &inv_updates, num_perm_types)?;
     Ok(messages)
-}
-
-/// Returns StdResult<()>
-///
-/// burns a list of tokens
-///
-/// # Arguments
-///
-/// * `deps` - a mutable reference to Extern containing all the contract's external dependencies
-/// * `block` - a reference to the current BlockInfo
-/// * `config` - a mutable reference to the Config
-/// * `sender` - a reference to the message sender address
-/// * `burns` - list of burns to perform
-fn burn_list(
-    deps: DepsMut,
-    block: &BlockInfo,
-    config: &mut Config,
-    sender: &CanonicalAddr,
-    burns: Vec<Burn>,
-) -> StdResult<()> {
-    let mut oper_for: Vec<CanonicalAddr> = Vec::new();
-    let mut inv_updates: Vec<InventoryUpdate> = Vec::new();
-    let num_perm_types = PermissionType::ViewOwner.num_types();
-    for burn in burns.into_iter() {
-        for token_id in burn.token_ids.into_iter() {
-            let (token, idx) = get_token_if_permitted(
-                deps.as_ref(),
-                block,
-                &token_id,
-                Some(sender),
-                PermissionType::Transfer,
-                &mut oper_for,
-                config,
-            )?;
-            if !config.burn_is_enabled && token.transferable {
-                return Err(StdError::generic_err(
-                    "Burn functionality is not enabled for this token",
-                ));
-            }
-            // log the inventory change
-            let inv_upd = if let Some(inv) = inv_updates
-                .iter_mut()
-                .find(|i| i.inventory.owner == token.owner)
-            {
-                inv
-            } else {
-                let inventory = Inventory::new(deps.storage, token.owner.clone())?;
-                let new_inv = InventoryUpdate {
-                    inventory,
-                    remove: HashSet::new(),
-                };
-                inv_updates.push(new_inv);
-                inv_updates.last_mut().ok_or_else(|| {
-                    StdError::generic_err("Just pushed an InventoryUpdate so this can not happen")
-                })?
-            };
-            inv_upd.inventory.remove(deps.storage, idx, false)?;
-            inv_upd.remove.insert(idx);
-            let token_key = idx.to_le_bytes();
-            // decrement token count
-            config.token_cnt = config.token_cnt.saturating_sub(1);
-            // remove from maps
-            let mut map2idx = PrefixedStorage::new(deps.storage, PREFIX_MAP_TO_INDEX);
-            remove(&mut map2idx, token_id.as_bytes());
-            let mut map2id = PrefixedStorage::new(deps.storage, PREFIX_MAP_TO_ID);
-            remove(&mut map2id, &token_key);
-            // remove the token info
-            let mut info_store = PrefixedStorage::new(deps.storage, PREFIX_INFOS);
-            remove(&mut info_store, &token_key);
-            // remove metadata if existent
-            let mut pub_store = PrefixedStorage::new(deps.storage, PREFIX_PUB_META);
-            remove(&mut pub_store, &token_key);
-            let mut priv_store = PrefixedStorage::new(deps.storage, PREFIX_PRIV_META);
-            remove(&mut priv_store, &token_key);
-            // remove mint run info if existent
-            let mut run_store = PrefixedStorage::new(deps.storage, PREFIX_MINT_RUN);
-            remove(&mut run_store, &token_key);
-            // remove royalty info if existent
-            let mut roy_store = PrefixedStorage::new(deps.storage, PREFIX_ROYALTY_INFO);
-            remove(&mut roy_store, &token_key);
-
-            let brnr = if token.owner == *sender {
-                None
-            } else {
-                Some(sender.clone())
-            };
-            // store the tx
-            store_burn(
-                deps.storage,
-                config,
-                block,
-                token_id,
-                token.owner,
-                brnr,
-                burn.memo.clone(),
-            )?;
-        }
-    }
-    save(deps.storage, CONFIG_KEY, &config)?;
-    update_owner_inventory(deps.storage, &inv_updates, num_perm_types)?;
-    Ok(())
 }
 
 /// Returns <Vec<String>>

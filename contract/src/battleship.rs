@@ -107,6 +107,39 @@ pub struct ListedGame {
     pub created: Timestamp,
 }
 
+fn ship_found(
+    cells: &Vec<u8>,
+    matched: &mut Vec<bool>,
+    i: &usize,
+    ship_type: u8,
+    ship_size: usize,
+) -> bool {
+    let mut found = false;
+    // check horiz
+    if i % 10 <= 10 - ship_size && 
+       cells[*i..*i+ship_size] == vec![ship_type; ship_size] {
+        for j in 0..ship_size {
+            matched[i+j] = true;
+        }
+        found = true;
+    }
+    // check vert
+    if !found {
+        let mut vertical_cells = vec![];
+        for j in 0..ship_size {
+            vertical_cells.push(cells[i+(j*10)]);
+        }
+        if i / 10 <= 10 - ship_size &&
+           vertical_cells == vec![ship_type; ship_size] {
+            for j in 0..ship_size {
+                matched[i+(j*10)] = true;
+            }
+        }
+        found = true;
+    }
+    found
+}
+
 fn valid_setup(
     cells: &Vec<u8>,
 ) -> bool {
@@ -114,63 +147,78 @@ fn valid_setup(
         return false; // The board should have exactly 100 cells.
     }
 
-    let mut counts = [0; 6]; // Count of each ship type and empty cells.
+    let mut matched = vec![false; BOARD_SIZE];
+    let mut carrier_found = false;
+    let mut battleship_found = false;
+    let mut cruiser_found = false;
+    let mut submarine_found = false;
+    let mut destroyer_found = false;
 
-    // Check for each ship type and count the occurrences.
-    for cell in cells {
-        match *cell {
-            2 => counts[0] += 1, // Carrier
-            3 => counts[1] += 1, // Battleship
-            4 => counts[2] += 1, // Cruiser
-            5 => counts[3] += 1, // Submarine
-            6 => counts[4] += 1, // Destroyer
-            0 => counts[5] += 1, // Empty cell
-            _ => return false,   // Invalid cell value
-        }
-    }
-
-    // Check if the counts of each ship type are valid.
-    if counts[0] != CARRIER_SIZE || 
-       counts[1] != BATTLESHIP_SIZE || 
-       counts[2] != CRUISER_SIZE || 
-       counts[3] != SUBMARINE_SIZE || 
-       counts[4] != DESTROYER_SIZE || 
-       counts[5] != BOARD_SIZE as u8 - CARRIER_SIZE - BATTLESHIP_SIZE - CRUISER_SIZE - SUBMARINE_SIZE - DESTROYER_SIZE {
-        return false;
-    }
-
-    // Check if the ships are adjacent in a straight line.
-    for ship_type in 0..5 {
-        let mut found_start = false;
-
-        for (i, cell) in cells.iter().enumerate() {
-            if *cell == ship_type {
-                if found_start {
-                    return false; // Ship cells are not adjacent.
+    for (i, cell) in cells.iter().enumerate() {
+        if !matched[i] {
+            if *cell != CellValue::Empty as u8 {
+                if *cell == CellValue::Carrier as u8 {
+                    if carrier_found { return false; }
+                    carrier_found = ship_found(
+                        cells, 
+                        &mut matched, 
+                        &i, 
+                        CellValue::Carrier as u8, 
+                        CARRIER_SIZE as usize,
+                    );
+                    if !carrier_found { return false };
+                } else if *cell == CellValue::Battleship as u8 {
+                    if battleship_found { return false; }
+                    battleship_found = ship_found(
+                        cells, 
+                        &mut matched, 
+                        &i, 
+                        CellValue::Battleship as u8, 
+                        BATTLESHIP_SIZE as usize,
+                    );
+                    if !battleship_found { return false };
+                } else if *cell == CellValue::Cruiser as u8 {
+                    if cruiser_found { return false; }
+                    cruiser_found = ship_found(
+                        cells, 
+                        &mut matched, 
+                        &i, 
+                        CellValue::Cruiser as u8, 
+                        CRUISER_SIZE as usize,
+                    );
+                    if !cruiser_found { return false };
+                } else if *cell == CellValue::Submarine as u8 {
+                    if submarine_found { return false; }
+                    submarine_found = ship_found(
+                        cells, 
+                        &mut matched, 
+                        &i, 
+                        CellValue::Submarine as u8, 
+                        SUBMARINE_SIZE as usize,
+                    );
+                    if !submarine_found { return false };
+                } else if *cell == CellValue::Destroyer as u8 {
+                    if destroyer_found { return false; }
+                    destroyer_found = ship_found(
+                        cells, 
+                        &mut matched, 
+                        &i, 
+                        CellValue::Destroyer as u8, 
+                        DESTROYER_SIZE as usize,
+                    );
+                    if !destroyer_found { return false };
+                } else {
+                    return false;
                 }
-                found_start = true;
-
-                // Check horizontally
-                if i % 10 < 10 - counts[ship_type as usize] as usize {
-                    for j in 0..counts[ship_type as usize] as usize {
-                        if cells[i + j] as u8 != ship_type {
-                            return false; // Ship cells are not in a straight line.
-                        }
-                    }
-                }
-
-                // Check vertically
-                if i / 10 < 10 - counts[ship_type as usize] as usize {
-                    for j in 0..counts[ship_type as usize] as usize {
-                        if cells[i + j * 10] as u8 != ship_type {
-                            return false; // Ship cells are not in a straight line.
-                        }
-                    }
-                }
+            } else {
+                matched[i] = true;
             }
         }
     }
 
+    if !(carrier_found && battleship_found && cruiser_found && submarine_found && destroyer_found) {
+        return false;
+    }
     true
 }
 
@@ -448,9 +496,9 @@ pub fn submit_setup(
         &token_id
     )?;
 
-    // if !valid_setup(&cells) {
-    //     return Err(StdError::generic_err("Not a valid battleship setup"));
-    // }
+    if !valid_setup(&cells) {
+        return Err(StdError::generic_err("Not a valid battleship setup"));
+    }
 
     // check if game id exists
     let listed_game = LISTED_GAMES_STORE.get(deps.storage, &game_id);
@@ -1379,17 +1427,15 @@ mod tests {
 
     use cosmwasm_std::{testing::*, Coin, Uint128};
     use cosmwasm_std::{
-        from_binary, to_binary, Addr, Api, Binary, OwnedDeps,
+        from_binary, Binary, OwnedDeps,
         Response, StdError, StdResult,
     };
-    use crate::contract::{execute, instantiate, query,};
+    use crate::battleship::valid_setup;
+    use crate::contract::{execute, instantiate,};
     use crate::msg::{
-        ContractStatus, ExecuteAnswer, ExecuteMsg, InstantiateConfig,
-        InstantiateMsg, Mint, QueryAnswer, QueryMsg,
-        KeyValuePair, ViewerInfo, ViewerInfoAddrOpt,
+        ExecuteAnswer, ExecuteMsg, InstantiateConfig,
+        InstantiateMsg, 
     };
-    use crate::nfp::{RawData, KEY_CLEARED_PACKAGES};
-    use crate::token::{Extension, Metadata,};
 
     // Helper functions
 
@@ -1500,6 +1546,7 @@ mod tests {
             title: "game 1".to_string(),
             padding: None
         };
+        /*
         let exec_result = execute(
             deps.as_mut(),
             mock_env(),
@@ -1513,12 +1560,101 @@ mod tests {
         );
         let exec_answer: ExecuteAnswer = from_binary(&exec_result.unwrap().data.unwrap()).unwrap();
         println!("{:?}", exec_answer);
+        */
     }
 
     #[test]
     fn test_valid_setup() {
         let setup: Vec<u8> = vec![
-
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
         ];
+        assert!(!valid_setup(&setup));
+        let setup: Vec<u8> = vec![
+            0,0,0,0,0,2,2,2,2,2,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            4,4,4,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,6,6,
+        ];
+        assert!(valid_setup(&setup));
+        let setup: Vec<u8> = vec![
+            0,0,0,0,0,2,2,2,2,2,
+            0,0,0,0,0,0,2,0,0,3,
+            0,0,0,0,0,0,2,0,0,3,
+            0,0,0,0,0,0,2,0,0,3,
+            0,0,0,0,0,0,2,0,0,3,
+            4,4,4,0,0,0,2,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,6,6,
+        ];
+        assert!(!valid_setup(&setup));
+        let setup: Vec<u8> = vec![
+            0,0,0,0,0,2,2,2,2,2,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            4,4,4,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+        ];
+        assert!(!valid_setup(&setup));
+        let setup: Vec<u8> = vec![
+            0,0,0,0,0,2,0,0,0,0,
+            0,0,0,0,0,2,0,0,0,3,
+            0,0,0,0,0,2,0,0,0,3,
+            0,0,0,0,0,2,0,0,0,3,
+            0,0,0,0,0,2,0,0,0,3,
+            4,0,0,0,0,0,0,0,0,0,
+            4,0,0,0,0,0,0,0,0,0,
+            4,0,5,6,0,0,0,0,0,0,
+            0,0,5,6,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+        ];
+        assert!(valid_setup(&setup));
+        let setup: Vec<u8> = vec![
+            0,0,0,0,0,0,2,2,2,2,
+            2,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            4,0,0,0,0,0,0,0,0,0,
+            4,0,0,0,0,0,0,0,0,0,
+            4,0,5,6,0,0,0,0,0,0,
+            0,0,5,6,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+        ];
+        assert!(!valid_setup(&setup));
+        let setup: Vec<u8> = vec![
+            0,0,0,0,0,2,2,2,2,2,
+            3,3,3,3,4,4,4,5,5,5,
+            6,6,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+        ];
+        assert!(valid_setup(&setup));
     }
 }

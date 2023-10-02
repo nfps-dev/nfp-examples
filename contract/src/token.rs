@@ -1,4 +1,4 @@
-use cosmwasm_std::{CanonicalAddr, Uint128, StdResult};
+use cosmwasm_std::{CanonicalAddr, StdResult};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use crate::state::Permission;
@@ -101,8 +101,6 @@ pub struct Extension {
     pub token_subtype: Option<String>,
     /// raw data stored on chain
     pub raw_data: Option<Vec<RawData>>,
-    /// genome
-    pub genome: Option<Uint128>,
 }
 
 impl Extension {
@@ -116,10 +114,6 @@ impl Extension {
                         .collect()
                 )
             },
-            None => None,
-        };
-        let genome = match self.genome {
-            Some(genome) => Some(genome.u128()),
             None => None,
         };
         Ok(StoredExtension {
@@ -136,7 +130,6 @@ impl Extension {
             protected_attributes: self.protected_attributes,
             token_subtype: self.token_subtype,
             raw_data: stored_raw_data,
-            genome,
         })
     }
 }
@@ -173,8 +166,6 @@ pub struct StoredExtension {
     pub token_subtype: Option<String>,
     /// raw data stored on chain.
     pub raw_data: Option<Vec<StoredRawData>>,
-    /// stored genome
-    pub genome: Option<u128>,
 }
 
 impl StoredExtension {
@@ -188,10 +179,6 @@ impl StoredExtension {
                         .collect()
                 )
             },
-            None => None,
-        };
-        let genome = match self.genome {
-            Some(genome) => Some(Uint128::from(genome)),
             None => None,
         };
         Ok(Extension {
@@ -208,7 +195,6 @@ impl StoredExtension {
             protected_attributes: self.protected_attributes,
             token_subtype: self.token_subtype,
             raw_data,
-            genome,
         })
     }
 }

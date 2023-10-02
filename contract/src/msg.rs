@@ -140,40 +140,6 @@ pub enum ExecuteMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// Mint multiple tokens
-    BatchMintNft {
-        /// list of mint operations to perform
-        mints: Vec<Mint>,
-        /// optional message length padding
-        padding: Option<String>,
-    },
-    /// create a mint run of clones that will have MintRunInfos showing they are serialized
-    /// copies in the same mint run with the specified quantity.  Mint_run_id can be used to
-    /// track mint run numbers in subsequent MintNftClones calls.  So, if provided, the first
-    /// MintNftClones call will have mint run number 1, the next time MintNftClones is called
-    /// with the same mint_run_id, those clones will have mint run number 2, etc...  If no
-    /// mint_run_id is specified, the clones will not have any mint run number assigned to their
-    /// MintRunInfos.  Because this mints to a single address, there is no option to specify
-    /// that the clones are non-transferable as there is no foreseen reason for someone to have
-    /// multiple copies of an nft that they can never send to others
-    MintNftClones {
-        /// optional mint run ID
-        mint_run_id: Option<String>,
-        /// number of clones to mint
-        quantity: u32,
-        /// optional owner address. if omitted, owned by the message sender
-        owner: Option<String>,
-        /// optional public metadata that can be seen by everyone
-        public_metadata: Option<Metadata>,
-        /// optional private metadata that can only be seen by the owner and whitelist
-        private_metadata: Option<Metadata>,
-        /// optional royalty information for these tokens
-        royalty_info: Option<RoyaltyInfo>,
-        /// optional memo for the mint txs
-        memo: Option<String>,
-        /// optional message length padding
-        padding: Option<String>,
-    },
     /// set the public and/or private metadata.  This can be called by either the token owner or
     /// a valid minter if they have been given this power by the appropriate config values
     SetMetadata {
@@ -183,28 +149,6 @@ pub enum ExecuteMsg {
         public_metadata: Option<Metadata>,
         /// the optional new private metadata
         private_metadata: Option<Metadata>,
-        /// optional message length padding
-        padding: Option<String>,
-    },
-    /// set royalty information.  If no token ID is provided, this royalty info will become the default
-    /// RoyaltyInfo for any new tokens minted on the contract.  If a token ID is provided, this can only
-    /// be called by the token creator and only when the creator is the current owner.  Royalties can not
-    /// be set on a token that is not transferable, because they can never be sold
-    SetRoyaltyInfo {
-        /// optional id of the token whose royalty information should be updated.  If not provided,
-        /// this updates the default royalty information for any new tokens minted on the contract
-        token_id: Option<String>,
-        /// the new royalty information.  If None, existing royalty information will be deleted.  It should
-        /// be noted, that if deleting a token's royalty information while the contract has a default royalty
-        /// info set up will give the token the default royalty information
-        royalty_info: Option<RoyaltyInfo>,
-        /// optional message length padding
-        padding: Option<String>,
-    },
-    /// Reveal the private metadata of a sealed token and mark the token as having been unwrapped
-    Reveal {
-        /// id of the token to unwrap
-        token_id: String,
         /// optional message length padding
         padding: Option<String>,
     },
@@ -327,26 +271,6 @@ pub enum ExecuteMsg {
     BatchSendNft {
         /// list of sends to perform
         sends: Vec<Send>,
-        /// optional message length padding
-        padding: Option<String>,
-    },
-    /// burn a token.  This can be always be done on a non-transferable token, regardless of whether burn
-    /// has been enabled on the contract.  An owner should always have a way to get rid of a token they do
-    /// not want, and burning is the only way to do that if the token is non-transferable
-    BurnNft {
-        /// token to burn
-        token_id: String,
-        /// optional memo for the tx
-        memo: Option<String>,
-        /// optional message length padding
-        padding: Option<String>,
-    },
-    /// burn many tokens.  This can be always be done on a non-transferable token, regardless of whether burn
-    /// has been enabled on the contract.  An owner should always have a way to get rid of a token they do
-    /// not want, and burning is the only way to do that if the token is non-transferable
-    BatchBurnNft {
-        /// list of burns to perform
-        burns: Vec<Burn>,
         /// optional message length padding
         padding: Option<String>,
     },
@@ -604,15 +528,6 @@ pub struct Mint {
     pub memo: Option<String>,
 }
 
-/// token burn info used when doing a BatchBurnNft
-#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
-pub struct Burn {
-    /// tokens being burnt
-    pub token_ids: Vec<String>,
-    /// optional memo for the tx
-    pub memo: Option<String>,
-}
-
 /// token transfer info used when doing a BatchTransferNft
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct Transfer {
@@ -656,31 +571,10 @@ pub enum ExecuteAnswer {
     MintNft {
         token_id: String,
     },
-    /// BatchMintNft will also display the minted tokens' IDs in the log attributes under the
-    /// key `minted` in case minting was done as a callback message
-    BatchMintNft {
-        token_ids: Vec<String>,
-    },
-    /// Displays the token ids of the first minted NFT and the last minted NFT.  Because these
-    /// are serialized clones, the ids of all the tokens minted in between should be easily
-    /// inferred.  MintNftClones will also display the minted tokens' IDs in the log attributes
-    /// under the keys `first_minted` and `last_minted` in case minting was done as a callback message
-    MintNftClones {
-        /// token id of the first minted clone
-        first_minted: String,
-        /// token id of the last minted clone
-        last_minted: String,
-    },
     SetMetadata {
         status: ResponseStatus,
     },
-    SetRoyaltyInfo {
-        status: ResponseStatus,
-    },
     MakeOwnershipPrivate {
-        status: ResponseStatus,
-    },
-    Reveal {
         status: ResponseStatus,
     },
     Approve {
@@ -711,12 +605,6 @@ pub enum ExecuteAnswer {
         status: ResponseStatus,
     },
     BatchSendNft {
-        status: ResponseStatus,
-    },
-    BurnNft {
-        status: ResponseStatus,
-    },
-    BatchBurnNft {
         status: ResponseStatus,
     },
     RegisterReceiveNft {
@@ -1017,14 +905,6 @@ pub enum QueryMsg {
         /// optional viewing key
         viewing_key: Option<String>,
     },
-    /// display if a token is unwrapped
-    IsUnwrapped { token_id: String },
-    /// display if a token is transferable
-    IsTransferable { token_id: String },
-    /// display that this contract implements non-transferable tokens
-    ImplementsNonTransferableTokens {},
-    /// display that this contract implements the use of the `token_subtype` metadata extension field
-    ImplementsTokenSubtype {},
     /// verify that the specified address has approval to transfer every listed token.
     /// A token will count as unapproved if it is non-transferable
     VerifyTransferApproval {
@@ -1051,15 +931,6 @@ pub enum QueryMsg {
     RegisteredCodeHash {
         /// the contract whose receive registration info you want to view
         contract: String,
-    },
-    /// display the royalty information of a token if a token ID is specified, or display the
-    /// contract's default royalty information in no token ID is provided
-    RoyaltyInfo {
-        /// optional ID of the token whose royalty information should be displayed.  If not
-        /// provided, display the contract's default royalty information
-        token_id: Option<String>,
-        /// optional address and key requesting to view the royalty information
-        viewer: Option<ViewerInfo>,
     },
     /// display the contract's creator
     ContractCreator {},
@@ -1327,18 +1198,6 @@ pub enum QueryAnswer {
     ApprovedForAll {
         operators: Vec<Cw721Approval>,
     },
-    IsUnwrapped {
-        token_is_unwrapped: bool,
-    },
-    IsTransferable {
-        token_is_transferable: bool,
-    },
-    ImplementsNonTransferableTokens {
-        is_enabled: bool,
-    },
-    ImplementsTokenSubtype {
-        is_enabled: bool,
-    },
     VerifyTransferApproval {
         approved_for_all: bool,
         first_unapproved_token: Option<String>,
@@ -1351,9 +1210,6 @@ pub enum QueryAnswer {
     RegisteredCodeHash {
         code_hash: Option<String>,
         also_implements_batch_receive_nft: bool,
-    },
-    RoyaltyInfo {
-        royalty_info: Option<DisplayRoyaltyInfo>,
     },
     ContractCreator {
         creator: Option<Addr>,
@@ -1447,13 +1303,6 @@ impl ContractStatus {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryWithPermit {
-    /// display the royalty information of a token if a token ID is specified, or display the
-    /// contract's default royalty information in no token ID is provided
-    RoyaltyInfo {
-        /// optional ID of the token whose royalty information should be displayed.  If not
-        /// provided, display the contract's default royalty information
-        token_id: Option<String>,
-    },
     /// displays the private metadata if permitted to view it
     PrivateMetadata { token_id: String },
     /// displays all the information about a token that the viewer has permission to

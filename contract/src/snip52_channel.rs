@@ -29,9 +29,9 @@ impl Channel {
 // Battleship channels
 
 /// id for the `game_listed` channel
-pub const GAME_LISTED_CHANNEL_ID: &str = "game_listed";
+//pub const GAME_LISTED_CHANNEL_ID: &str = "game_listed";
 /// CDDL Schema for game listed data
-pub const GAME_LISTED_CHANNEL_SCHEMA: &str = "game_listed=[game_id:text,title:text,wager_uscrt:biguint]";
+//pub const GAME_LISTED_CHANNEL_SCHEMA: &str = "game_listed=[game_id:text,title:text,wager_uscrt:biguint]";
 
 /// id for `game_updated` channel
 pub const GAME_UPDATED_CHANNEL_ID: &str = "game_updated";
