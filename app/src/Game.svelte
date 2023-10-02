@@ -1,28 +1,50 @@
 <script lang="ts">
-	import type {ActiveGame, CellValue, ListedGame} from './interface/app';
+	import type {PlayerRole, type ActiveGame, type CellValue, type ListedGame} from './interface/app';
 	import type {Nilable} from '@blake.regalia/belt';
 	import type {UiController} from '@nfps.dev/components/NeutrinoWallet';
 	
-	import {__UNDEFINED, timeout} from '@blake.regalia/belt';
+	import type {Uint8} from '@solar-republic/contractor';
+	
+	import {__UNDEFINED, F_IDENTITY, timeout} from '@blake.regalia/belt';
 	
 	import {A_TOKEN_LOCATION} from 'nfpx:bootloader';
 	import {slide} from 'svelte/transition';
+	
+	import {TurnState} from './interface/app';
+	
 	
 	import {XG_LIMIT_BASE} from './stores';
 	
 	import Grid from './Grid.svelte';
 	const {K_SERVICE} = destructureImportedNfpModule('app');
 
+	const attack_cell = async(i_cell: number) => {
+		b_lock_away = true;
+		y_neutrino.status(1);
 
-	export let g_listing: ListedGame;
+		// submit move
+		const [g_res, xc_code, s_res] = await K_SERVICE.exec('attack_cell', {
+			token_id: A_TOKEN_LOCATION[2],
+			game_id: g_game.game_id,
+			cell: i_cell as Uint8,
+		}, XG_LIMIT_BASE);
 
-	export let g_state: ActiveGame;
+		b_lock_away = false;
+		y_neutrino.status(0);
 
-	export let y_neutrino: UiController;
+		// success
+		if(g_res) {
+			// update away grid and turn
+			a_away = g_res.away;
+			xc_turn = g_res.turn;
+		}
+		// failure
+		else {
+			y_neutrino.tx_err(s_res);
+		}
+	};
 
-	let b_game_on = false;
-
-	let f_retry: Nilable<() => void>;
+	const handle_attack = ({detail:i_cell}: CustomEvent<number>) => attack_cell(i_cell);
 
 	const submit_setup = async({detail:a_cells}: {detail: CellValue[]}) => {
 		// reset retry handler
@@ -34,10 +56,12 @@
 		// set wallet ui status to busy
 		y_neutrino.status(1);
 
+		console.log(`Submitting setup: [${a_cells.join(',')}]`);
+
 		// execute contract
 		const [, xc_code, s_res] = await K_SERVICE.exec('submit_setup', {
 			token_id: A_TOKEN_LOCATION[2],
-			game_id: g_listing.game_id,
+			game_id: g_game.game_id,
 			cells: a_cells,
 		}, XG_LIMIT_BASE);
 
@@ -58,6 +82,37 @@
 			b_game_on = true;
 		}
 	};
+
+	export let g_game: ActiveGame;
+
+	export let y_neutrino: UiController;
+
+	let a_home: CellValue[] = Array(100).fill(0);
+	let a_away: CellValue[] = a_home.slice();
+
+	let b_game_on = false;
+
+	let b_lock_away = false;
+
+	let xc_turn = TurnState.WAITING_FOR_PLAYER;
+
+	let xc_role: PlayerRole;
+
+	let f_retry: Nilable<() => void>;
+
+	// when game state updates
+	$: if(g_game.turn) {
+		// home is not all empty
+		b_game_on = g_game.home.some(F_IDENTITY);
+
+		// update cells
+		a_away = [...g_game.away];
+		a_home = [...g_game.home];
+
+		// update turn state
+		xc_turn = g_game.turn;
+		xc_role = g_game.role;
+	}
 </script>
 
 <style lang="less">
@@ -89,6 +144,7 @@
 
 		position: relative;
 		z-index: 1;
+		width: 500px;
 	}
 
 	.game-on {
@@ -99,7 +155,7 @@
 <section>
 	<div class="above">
 		<h2 style="text-align:center">
-			{g_listing.title}
+			{g_game.title}
 		</h2>
 
 		<div class="controls">
@@ -112,8 +168,19 @@
 	</div>
 
 	<div class="board" class:game-on={b_game_on}>
-		<Grid b_game_on={b_game_on} />
-		<Grid b_game_on={b_game_on} b_home
+		<Grid
+			{b_game_on}
+			{xc_turn}
+			{xc_role}
+			a_cells={a_away}
+			b_locked={b_lock_away}
+			on:attack={handle_attack}
+		/>
+		<Grid b_home
+			{b_game_on}
+			{xc_turn}
+			{xc_role}
+			a_cells={a_home}
 			on:submit={submit_setup}
 		/>
 	</div>

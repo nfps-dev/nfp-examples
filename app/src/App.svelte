@@ -1,8 +1,10 @@
 <script lang="ts">
 	import type {ActiveGame, ListedGame} from './interface/app';
-	import type {Coin, Timestamp, Uint128} from '@solar-republic/contractor';
+	import type {SecretAccAddr, Uint128} from '@solar-republic/contractor';
 	
+	import {oda} from '@blake.regalia/belt';
 	import NeutrinoWallet, {type UiController} from '@nfps.dev/components/NeutrinoWallet';
+	import {subscribe_snip52_channels, type WeakSecretAccAddr} from '@solar-republic/neutrino';
 	
 	import {A_TOKEN_LOCATION, K_CONTRACT} from 'nfpx:bootloader';
 	
@@ -39,9 +41,9 @@
 		const [, xc_code, s_res] = await K_SERVICE.exec('join_game', {
 			token_id: A_TOKEN_LOCATION[2],
 			game_id: g_game.game_id,
-		}, XG_LIMIT_BASE, [
+		}, XG_LIMIT_BASE, '0' as Uint128 !== g_game.wager.amount? [
 			[g_game.wager.amount, 'uscrt'],
-		]);
+		]: []);
 
 		// toggle off busy flag
 		y_neutrino.status(b_loading=false);
@@ -52,10 +54,10 @@
 		}
 		// success
 		else {
-			g_active_game_listing = g_game;
-			g_active_game_state = {
+			g_game_active = {
+				...g_game,
 				role: PlayerRole.JOINER,
-				state: TurnState.WAITING_FOR_BOTH_PLAYERS_SETUP,
+				turn: TurnState.WAITING_FOR_BOTH_PLAYERS_SETUP,
 				home: Array(100).fill(CellValue.EMPTY),
 				away: Array(100).fill(CellValue.EMPTY),
 			};
@@ -77,10 +79,11 @@
 			throw new Error(`Failed to load game state: ${s_err}`);
 		}
 		// success
-		else {
-			// set active game
-			g_active_game_listing = g_res!;
-			g_active_game_state = g_res!;
+		else if(g_res) {
+			// game has started
+			if(g_res.turn) {
+				g_game_active = g_res as unknown as ActiveGame;
+			}
 		}
 	};
 
@@ -110,29 +113,49 @@
 			}
 		}
 
+		// subscribe to game state updates
+		await subscribe_snip52_channels(K_WALLET.rpc, K_CONTRACT, Z_AUTH, {
+			game_updated([si_game, a_home, xc_turn]) {
+				// not for the active game
+				if(si_game !== g_game_active?.game_id) {
+					// for an own listed game
+					for(const g_listed of a_games_own) {
+						if(si_game === g_listed.game_id) {
+							// convert listing into active game
+							g_game_active = {
+								...g_listed,
+								role: PlayerRole.INITIATOR,
+								away: Array(100).fill(0),
+								home: a_home,
+								turn: xc_turn,
+							};
+						}
+					}
+
+					// done
+					return;
+				}
+
+				// player is playing themself, wrong token; ignore
+				if(xc_turn < TurnState.GAME_OVER_INITIATOR_WON && g_game_active.role as number !== xc_turn % 2) return;
+
+				// reactive update assignment
+				g_game_active = {
+					...g_game_active,
+					home: a_home,
+					turn: xc_turn,
+				};
+			},
+		});
+
 		// done loading
 		b_loading = false;
 	};
 
-	const show_board = import.meta.env? () => {
-		g_active_game_state = {
-			role: PlayerRole.JOINER,
-			state: TurnState.WAITING_FOR_BOTH_PLAYERS_SETUP,
-			home: Array(100).fill(CellValue.EMPTY),
-			away: Array(100).fill(CellValue.EMPTY),
-		};
-
-		g_active_game_listing = {
-			created: (Date.now()*1e3)+'' as Timestamp,
-			title: 'Test',
-			game_id: 'dev',
-			wager: {
-				amount: '0' as Uint128,
-				denom: 'uscrt',
-			} as Coin,
-		};
-	}: void 0;
-
+	function spendable_gas_refreshed({detail:[, a_granters]}: CustomEvent<[bigint, [SecretAccAddr, string][]]>) {
+		const [sa_granter] = a_granters.reduce((a_best, a_each) => +a_each[1] > +a_best[1]? a_each: a_best, ['', '0']);
+		K_SERVICE.granter(sa_granter as WeakSecretAccAddr);
+	}
 
 	// dom bindings
 	let dm_error: HTMLDialogElement;
@@ -144,22 +167,18 @@
 	let s_error = '';
 
 	// active game
-	let g_active_game_listing: ListedGame;
-	let g_active_game_state: ActiveGame;
+	let g_game_active: ActiveGame;
 
 	let y_neutrino: UiController;
+
+	let a_games_own: ListedGame[];
 
 	$: if(s_error) {
 		dm_error.showModal();
 	}
 
 	// start load
-	if(!import.meta.env.DEV) {
-		void load();
-	}
-	else {
-		show_board!();
-	}
+	void load();
 </script>
 
 <style lang="less">
@@ -242,17 +261,20 @@
 		</form>
 	</dialog>
 
-	{#if import.meta.env.DEV}
-		<button on:click={show_board}>
-			Dev: Show Board
-		</button>
-	{/if}
-
-	{#if g_active_game_listing}
-		<Game g_listing={g_active_game_listing} g_state={g_active_game_state} {y_neutrino} />
+	{#if g_game_active}
+		<Game g_game={g_game_active} {y_neutrino} />
 	{:else}
-		<Lobby b_busy={b_loading} {y_neutrino} on:join={join_game} />
+		<Lobby
+			bind:a_games_own={a_games_own}
+			b_busy={b_loading}
+			{y_neutrino}
+			on:join={join_game}
+		/>
 	{/if}
 </main>
 
-<NeutrinoWallet args={[K_WALLET, SA_OWNER, Z_AUTH, A_COMCS, K_CONTRACT, dm_foreign]} bind:controller={y_neutrino} />
+<NeutrinoWallet
+	on:spendable_gas_refreshed={spendable_gas_refreshed}
+	bind:controller={y_neutrino}
+	args={[K_WALLET, SA_OWNER, Z_AUTH, A_COMCS, K_CONTRACT, dm_foreign]}
+	/>

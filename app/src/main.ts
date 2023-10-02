@@ -67,6 +67,10 @@ dm_pause.onclick = () => {
 	dm_pause.textContent = dm_root.classList.toggle('paused')? 'Resume': 'Pause';
 };
 
+// read optional query params to override token id
+const d_params = new URLSearchParams(location.search);
+A_TOKEN_LOCATION[2] = d_params.get('token-id') || A_TOKEN_LOCATION[2];
+
 const si_storage_token_owner_addr = 'toa:'+A_TOKEN_LOCATION.join(':');
 
 // fetch token owner address

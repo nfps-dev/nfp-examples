@@ -1,15 +1,24 @@
 <script lang="ts">
-	import {oda, timeout} from '@blake.regalia/belt';
+	
+	import type {PlayerRole} from './interface/app';
+	
+	import {oda, timeout, F_IDENTITY} from '@blake.regalia/belt';
 	import {create_html, qs, qsa} from '@nfps.dev/runtime';
 	
 	import {createEventDispatcher, onMount} from 'svelte';
 	
+	import {fade} from 'svelte/transition';
+	
 	import {random} from './graphics';
+	
+	import {CellValue, TurnState} from './interface/app';
 	
 	import {NL_SPRITES, draw_sprite} from './sprites';
 	import {A_VEHICLES, H_VEHICLE_NAMES, H_VEHICLE_WIDTHS, SX_VEHICLES, clip_dims, draw_vehicle, draw_x} from './vehicles';
 
 	const XL_CANVAS_DIM = 460;
+
+	const XM_WITHOUT_HIT = 0xff ^ CellValue.HIT;
 
 	const A_COLS = 'ABCDEFGHIJ'.split('');
 
@@ -21,12 +30,20 @@
 
 	const A_PLACEMENTS: [number, number, boolean][] = [];
 
-	const dispatch = createEventDispatcher();
+	const dispatch = createEventDispatcher<{
+		attack: number;
+		submit: CellValue[];
+	}>();
 
 	export let b_home = false;
 	export let b_game_on = false;
+	export let b_locked = false;
 
-	let a_grid = Array(100).fill(0);
+	export let xc_turn: TurnState;
+	export let xc_role: PlayerRole;
+
+	export let a_cells: CellValue[];
+	let a_cells_drawn: CellValue[] = [];
 
 	let dm_overlay0: HTMLCanvasElement;
 	let dm_overlay1: HTMLCanvasElement;
@@ -35,9 +52,9 @@
 
 	let dm_grid: HTMLDivElement;
 
-	let d_2d0: CanvasRenderingContext2D;
-	let d_2d1: CanvasRenderingContext2D;
-	let d_2d2: CanvasRenderingContext2D;
+	let d_2d0_decals: CanvasRenderingContext2D;
+	let d_2d_bangs: CanvasRenderingContext2D;
+	let d_2d2_vehicles: CanvasRenderingContext2D;
 
 
 	// the cell the user is targetting with cursor
@@ -56,8 +73,10 @@
 	// $: [sx_clip, sx_obj_pos] = i_vehicle < A_VEHICLES.length? clip_path(A_VEHICLES[i_vehicle]): 'none';
 	$: [sx_preview_w, sx_preview_h, sx_preview_pos] = i_vehicle < 0? []: clip_dims(A_VEHICLES[i_vehicle]);
 
-	let a_grid_prospective = a_grid.slice();
+	let a_grid_prospective = a_cells.slice();
 	let b_intersects = false;
+
+	$: b_our_turn = xc_turn % 2 === xc_role as number;
 
 
 
@@ -97,7 +116,7 @@
 
 	const position_vehicle = (b_rotated: boolean) => {
 		// vehicle canvas
-		d_2d2.clearRect(0, 0, XL_CANVAS_DIM, XL_CANVAS_DIM);
+		d_2d2_vehicles.clearRect(0, 0, XL_CANVAS_DIM, XL_CANVAS_DIM);
 
 		// un-hover all cells
 		qsa(dm_grid, 'td.hover').map(dm => dm.classList.remove('hover'));
@@ -117,25 +136,25 @@
 		}
 
 		// draw the vehicle
-		draw_vehicle(d_2d2, xc_vehicle as number, i_index_placement, b_rotated);
+		draw_vehicle(d_2d2_vehicles, xc_vehicle as number, i_index_placement, b_rotated);
 
 		// draw previous placements
 		for(const [xc_vehicle_placed, i_index, b_rot] of A_PLACEMENTS) {
-			draw_vehicle(d_2d2, xc_vehicle_placed, i_index, b_rot);
+			draw_vehicle(d_2d2_vehicles, xc_vehicle_placed, i_index, b_rot);
 		}
 
 		// reset intersection flag
 		b_intersects = false;
 
 		// reset prospective grid vector
-		a_grid_prospective = [...a_grid];
+		a_grid_prospective = [...a_cells];
 
 		// check each footprint cell for intersection
 		for(let c_span=0, i_index_footprint=i_index_placement; c_span<x_vehicle_width; c_span++, i_index_footprint+=b_rotated? 10: 1) {
 			// cell is occupied
 			if(a_grid_prospective[i_index_footprint]) {
 				// draw "X"
-				draw_x(d_2d2, i_index_footprint);
+				draw_x(d_2d2_vehicles, i_index_footprint);
 
 				// set intersection flag
 				b_intersects = true;
@@ -151,28 +170,28 @@
 	};
 
 	const graphics_rock = (xl_x: number, xl_y: number, xl_w: number, xl_h: number, xl_r: number) => {
-		d_2d0.beginPath();
-		d_2d0.moveTo(xl_x + xl_r, xl_y);
-		d_2d0.arcTo(xl_x + xl_w, xl_y, xl_x + xl_w, xl_y + xl_h, xl_r);
-		d_2d0.arcTo(xl_x + xl_w, xl_y + xl_h, xl_x, xl_y + xl_h, xl_r);
-		d_2d0.arcTo(xl_x, xl_y + xl_h, xl_x, xl_y, xl_r);
-		d_2d0.arcTo(xl_x, xl_y, xl_x + xl_w, xl_y, xl_r);
-		d_2d0.closePath();
-		d_2d0.fill();
+		d_2d0_decals.beginPath();
+		d_2d0_decals.moveTo(xl_x + xl_r, xl_y);
+		d_2d0_decals.arcTo(xl_x + xl_w, xl_y, xl_x + xl_w, xl_y + xl_h, xl_r);
+		d_2d0_decals.arcTo(xl_x + xl_w, xl_y + xl_h, xl_x, xl_y + xl_h, xl_r);
+		d_2d0_decals.arcTo(xl_x, xl_y + xl_h, xl_x, xl_y, xl_r);
+		d_2d0_decals.arcTo(xl_x, xl_y, xl_x + xl_w, xl_y, xl_r);
+		d_2d0_decals.closePath();
+		d_2d0_decals.fill();
 	};
 
 	const graphics_blast = (i_index: number) => {
 		const i_sprite = Math.floor(random(NL_SPRITES, 1));
 
-		d_2d0.globalCompositeOperation = 'multiply';
-		d_2d0.globalAlpha = 0.95;
+		d_2d0_decals.globalCompositeOperation = 'multiply';
+		d_2d0_decals.globalAlpha = 0.95;
 
-		draw_sprite(d_2d0, i_index, i_sprite);
+		draw_sprite(d_2d0_decals, i_index, i_sprite);
 	};
 
 	const graphics_bang = (i_index: number, xl_enlarge=0) => {
-		d_2d1.globalCompositeOperation = 'lighter';
-		draw_sprite(d_2d1, i_index, 0, xl_enlarge);
+		d_2d_bangs.globalCompositeOperation = 'lighter';
+		draw_sprite(d_2d_bangs, i_index, 0, xl_enlarge);
 	};
 
 	const explode = async(i_index: number) => {
@@ -183,25 +202,25 @@
 		graphics_bang(i_index, 10);
 
 		await timeout(250);
-		dm_overlay1.style.opacity = '0.4';
+		dm_overlay2.style.opacity = '0.4';
 
 		await timeout(150);
-		d_2d1.clearRect(0, 0, XL_CANVAS_DIM, XL_CANVAS_DIM);
-		dm_overlay1.style.opacity = '1';
+		d_2d_bangs.clearRect(0, 0, XL_CANVAS_DIM, XL_CANVAS_DIM);
+		dm_overlay2.style.opacity = '1';
 	};
 
 
 	const graphics = () => {
-		d_2d0.save();
+		d_2d0_decals.save();
 
-		oda(d_2d0, {
+		oda(d_2d0_decals, {
 			shadowOffsetX: -2,
 			shadowOffsetY: 2,
 			shadowBlur: 2,
 			shadowColor: '#a66a4f',
 		});
 
-		d_2d0.fillStyle = '#f3cfa1';
+		d_2d0_decals.fillStyle = '#f3cfa1';
 
 		for(let i_rock=0; i_rock<16; i_rock++) {
 			graphics_rock(
@@ -213,22 +232,28 @@
 			);
 		}
 
-		d_2d0.restore();
+		d_2d0_decals.restore();
 	};
 
 	const click_grid = (d_event: MouseEvent) => {
+		// grid is locked
+		if(b_locked) return;
+
 		// find table cell element
 		const dm_td = (d_event.target as HTMLTableCellElement)?.closest('td');
 		if(dm_td) {
 			// home grid
 			if(b_home) {
+				// game is on; do nothing
+				if(b_game_on) return;
+
 				// no intersection
 				if(!b_intersects) {
 					// save vehicle placement
 					A_PLACEMENTS.push([A_VEHICLES[i_vehicle], i_index_placement, d_event.shiftKey]);
 
 					// update grid
-					a_grid = a_grid_prospective;
+					a_cells = a_grid_prospective;
 
 					// style table cells
 					qsa(dm_grid, 'td.hover').map(dm => dm.classList.add('set'));
@@ -250,14 +275,91 @@
 						qsa(dm_grid, 'td').map(dm => dm.className = '');
 	
 						// submit setup
-						dispatch('submit', a_grid);
+						dispatch('submit', a_cells);
 					}
 				}
 			}
-			else {
-				void explode(+dm_td.dataset['index']!);
+			// clicked on 'away' cell while it is our turn
+			else if(b_our_turn) {
+				const i_cell = +dm_td.dataset['index']!;
+
+				// indicate
+				dm_td.classList.add('set');
+
+				dispatch('attack', i_cell);
+
+				// void explode(i_cell);
 			}
 		}
+	};
+
+	const update_display = () => {
+		const b_update = a_cells_drawn.some(F_IDENTITY);
+
+		const as_seen = new Set<number>();
+
+		// each cell in grid
+		for(let i_cell=0; i_cell<a_cells.length && as_seen.size < A_VEHICLES.length; i_cell++) {
+			const xc_drawn = a_cells_drawn[i_cell];
+			let xc_cell = a_cells[i_cell];
+
+			// empty cell or no update
+			if(!xc_cell || xc_drawn === xc_cell) continue;
+
+			// cell was missed (both home and away)
+			if(xc_cell === CellValue.MISS) {
+				// state differs from what was drawn
+				if(b_update) {
+					void explode(i_cell);
+				}
+				else {
+					graphics_blast(i_cell);
+				}
+			}
+			// something unknown on away grid was hit
+			else if(xc_cell === CellValue.HIT) {
+				// state differs from what was drawn
+				if(b_update) {
+					void explode(i_cell);
+				}
+				else {
+					graphics_blast(i_cell);
+				}
+
+				draw_x(d_2d2_vehicles, i_cell);
+			}
+			else {
+				// remove hit bitmask
+				const b_hit = xc_cell & CellValue.HIT;
+				xc_cell &= XM_WITHOUT_HIT;
+
+				// only if this is the start of the vehicle
+				if((a_cells[i_cell-1] & XM_WITHOUT_HIT) !== (xc_cell as number) && (a_cells[i_cell-10] & XM_WITHOUT_HIT) !== (xc_cell as number)) {
+					// horizontal or vertical
+					const b_rotated = (xc_cell as number) !== (a_cells[i_cell+1] & XM_WITHOUT_HIT);
+
+					// TODO: if vehicle is destroyed
+
+					draw_vehicle(d_2d2_vehicles, xc_cell, i_cell, b_rotated);
+				}
+
+				// a home vehicle was hit or an away vehicle was destroyed
+				if(b_hit) {
+					// state differs from what was drawn
+					if(b_update) {
+						void explode(i_cell);
+					}
+					else {
+						graphics_blast(i_cell);
+					}
+
+					draw_x(d_2d2_vehicles, i_cell);
+				}
+			}
+		}
+
+		// update drawn state
+		a_cells_drawn = [...a_cells];
 	};
 
 	onMount(() => {
@@ -301,11 +403,11 @@
 
 		dm_grid.append(dm_cols, dm_middle, dm_cols.cloneNode(true));
 
-		d_2d0 = dm_overlay0.getContext('2d')!;
-		d_2d1 = dm_overlay1.getContext('2d')!;
-		d_2d2 = dm_overlay2.getContext('2d')!;
+		d_2d0_decals = dm_overlay0.getContext('2d')!;
+		d_2d2_vehicles = dm_overlay1.getContext('2d')!;
+		d_2d_bangs = dm_overlay2.getContext('2d')!;
 
-		d_2d2.globalCompositeOperation = 'source-over';
+		d_2d2_vehicles.globalCompositeOperation = 'source-over';
 
 		graphics();
 
@@ -314,6 +416,13 @@
 		}
 	});
 
+	$: if(d_2d2_vehicles && a_cells.some(F_IDENTITY)) {
+		// reset all tds
+		qsa(dm_grid, 'td').map(dm => dm.className = '');
+
+		// update display
+		update_display();
+	}
 </script>
 
 <style lang="less">
@@ -343,18 +452,18 @@
 		// transition: transform 2s ease-in-out;
 		transform: rotateX(0deg) translate3d(0, 0px, 0px);
 
-		&:not(.home) {
+		&:where(:not(.home)) {
 			transform: rotateX(-90deg) translate3d(0, 0px, -@xl_shift);
 		}
+	}
+
+	.game-on {
+		animation: 2.6s ease-in-out 1 both away-entry;
 	}
 
 	.home {
 		animation-name: home-entry;
 		animation-delay: 250ms;
-	}
-
-	.game-on {
-		animation: 2.6s ease-in-out 1 both away-entry;
 	}
 
 	.grid {
@@ -380,7 +489,9 @@
 	}
 
 	.info {
-		margin-left: 2em;
+		position: absolute;
+		left: 500px;
+		min-width: 400px;
 
 		>div {
 			margin: 6px 0;
@@ -430,47 +541,67 @@
 		</div>
 	</div>
 
-	<!-- placement mode -->
-	{#if i_vehicle >= 0}
-		<div class="info">
-			<h3>
-				Place vehicle:
-			</h3>
+	<div class="info">
+		<!-- home grid -->
+		{#if b_home}
+			<!-- placement mode -->
+			{#if i_vehicle >= 0}
+				<h3>
+					Place vehicle:
+				</h3>
 
-			<div>
-				<em>
-					Hold SHIFT to rotate 90 degrees.
-				</em>
-			</div>
+				<div>
+					<em>
+						Hold SHIFT to rotate 90 degrees.
+					</em>
+				</div>
 
-			<div>
-				<dt>
-					Class:
-				</dt>
-				<dd>
-					{H_VEHICLE_NAMES[A_VEHICLES[i_vehicle]]}
-				</dd>
-			</div>
+				<div>
+					<dt>
+						Class:
+					</dt>
+					<dd>
+						{H_VEHICLE_NAMES[A_VEHICLES[i_vehicle]]}
+					</dd>
+				</div>
 
-			<div>
-				<dt>
-					Size:
-				</dt>
-				<dd>
-					{H_VEHICLE_WIDTHS[xc_vehicle]} units
-				</dd>
-			</div>
+				<div>
+					<dt>
+						Size:
+					</dt>
+					<dd>
+						{H_VEHICLE_WIDTHS[xc_vehicle]} units
+					</dd>
+				</div>
 
-			<div class="preview-obj"
-				style:background-image={`url('${SX_VEHICLES}')`}
-				style:background-position={sx_preview_pos}
-				style:width={sx_preview_w}
-				style:height={sx_preview_h}
-			/>
+				<div class="preview-obj"
+					style:background-image={`url('${SX_VEHICLES}')`}
+					style:background-position={sx_preview_pos}
+					style:width={sx_preview_w}
+					style:height={sx_preview_h}
+				/>
 
-			<!-- <div class="preview-img">
-				<img src={SX_VEHICLES} alt="" style:clip-path={sx_clip} style:object-position={sx_obj_pos} />
-			</div> -->
-		</div>
-	{/if}
+				<!-- <div class="preview-img">
+					<img src={SX_VEHICLES} alt="" style:clip-path={sx_clip} style:object-position={sx_obj_pos} />
+				</div> -->
+			{/if}
+		<!-- away grid -->
+		{:else}
+			<span>
+				<dt>Role</dt>
+				<dd>{xc_role}</dd>
+
+				<dt>Turn</dt>
+				<dd>{xc_turn}</dd>
+			</span>
+
+			{#if [TurnState.INITIATORS_TURN, TurnState.JOINERS_TURN].includes(xc_turn)}
+				<div transition:fade>
+					<h3>
+						{b_our_turn? 'Your': 'Their'} turn
+					</h3>
+				</div>
+			{/if}
+		{/if}
+	</div>
 </section>

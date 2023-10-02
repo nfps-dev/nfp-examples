@@ -1,11 +1,12 @@
 
+import type {U} from 'ts-toolbelt';
+
 import type {
 	Coin, Timestamp, Uint128, Uint32, Uint8,
 	SecretContractInterface, Snip52, Snip821,
 	MethodDescriptorGroup, MethodGroup, WithSnipAuthViewer, MakeQueryPermitVariants,
 } from '@solar-republic/contractor';
 
-import { U } from 'ts-toolbelt';
 
 
 type WagerAmountsScrt = '1' | '2' | '5' | '10';
@@ -78,7 +79,7 @@ export enum CellValue {
 	SCOUT,
 
 	// for `away` grid only: player hit a vessel but has not yet sunk it
-	HIT_UNKNOWN=0x80,
+	HIT=0x80,
 }
 
 
@@ -95,9 +96,9 @@ export type ListedGame = {
 /**
  * Used to represent the complete state of an active game
  */
-export type ActiveGame = {
+export type ActiveGame = ListedGame & {
 	role: PlayerRole;
-	state: TurnState;
+	turn: TurnState;
 	home: CellValue[];
 	away: CellValue[];
 };
@@ -139,14 +140,14 @@ type AuthenticatedQueries = MethodGroup.Canonicalize<
 			/**
 			 * Fetches the current game state
 			 */
-			game_state: [{}, ListedGame & ActiveGame];
+			game_state: [{}, ActiveGame];
 		}>
 	>
 >;
 
 export type AppInterface<w_defer=never> = SecretContractInterface<{
 	extends: [
-		Snip52,
+		// Snip52,
 		// Snip821,
 	];
 
@@ -167,7 +168,7 @@ export type AppInterface<w_defer=never> = SecretContractInterface<{
 			game_updated: [
 				game_id: string,
 				home: CellValue[],
-				state: TurnState,
+				turn: TurnState,
 			];
 		};
 	};
@@ -209,8 +210,9 @@ export type AppInterface<w_defer=never> = SecretContractInterface<{
 			attack_cell: [{
 				cell: Uint8;
 			}, {
-				away: CellValue[];
 				// result: CellValue;
+				away: CellValue[];
+				turn: TurnState;
 			}];
 
 			/**

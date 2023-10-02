@@ -2,7 +2,7 @@
 	import type {ListedGame} from './interface/app';
 
 	import type {UiController} from '@nfps.dev/components/NeutrinoWallet';
-	import type {Uint128, Coin, Timestamp} from '@solar-republic/contractor';
+	import type {Uint128} from '@solar-republic/contractor';
 	
 	import {subscribe_snip52_channels} from '@solar-republic/neutrino';
 	import {A_TOKEN_LOCATION, K_CONTRACT, SH_VIEWING_KEY} from 'nfpx:bootloader';
@@ -20,6 +20,18 @@
 	} = destructureImportedNfpModule('app');
 
 	const refresh = async() => {
+		// query for active games
+		let a_active: string[] = [];
+		{
+			const [g_res,, s_err] = await K_SERVICE.query('active_games', {
+				token_id: A_TOKEN_LOCATION[2],
+			}, Z_AUTH);
+
+			if(g_res) {
+				a_active = g_res.game_ids;
+			}
+		}
+
 		// query for listed games
 		const [g_res,, s_err] = await K_SERVICE.query('list_games', {
 			token_id: A_TOKEN_LOCATION[2],
@@ -27,7 +39,8 @@
 
 		// success; update games list
 		if(g_res) {
-			a_games = g_res.games;
+			a_games = g_res.games.filter(g => !a_active.includes(g.game_id));
+			a_games_own = g_res.games.filter(g => a_active.includes(g.game_id));
 		}
 		// error
 		else {
@@ -40,49 +53,57 @@
 		// load the set of listed games
 		await refresh();
 
-		// subscribe to notification channel for when new games are listed
-		await subscribe_snip52_channels(K_WALLET.rpc, K_CONTRACT, [SH_VIEWING_KEY, SA_OWNER], {
-			game_listed(a_details) {
-				const [si_game, s_title, xg_wager] = a_details;
+		// // subscribe to notification channel for when new games are listed
+		// await subscribe_snip52_channels(K_WALLET.rpc, K_CONTRACT, [SH_VIEWING_KEY, SA_OWNER], {
+		// 	// game_listed(a_details) {
+		// 	// 	const [si_game, s_title, xg_wager] = a_details;
 
-				// append to games list
-				a_games = [...a_games, {
-					game_id: si_game,
-					title: s_title,
-					wager: {amount:xg_wager} as Coin,
-					created: Date.now()+'000' as Timestamp,
-				}];
-			},
-		});
+		// 	// 	// append to games list
+		// 	// 	a_games = [...a_games, {
+		// 	// 		game_id: si_game,
+		// 	// 		title: s_title,
+		// 	// 		wager: {amount:xg_wager} as Coin,
+		// 	// 		created: Date.now()+'000000' as Timestamp,
+		// 	// 	}];
+		// 	// },
+		// });
+
+		// refresh every so often
+		setInterval(() => {
+			void refresh();
+		}, 15e3);
 	});
 
 
 	const A_ADJECTIVES = [
-		'Nautical',
+		'Scorched',
 		'Anchored',
 		'Formidable',
 		'Armored',
-		'Maritime',
+		'Nomadic',
 		'Ironclad',
 		'Steely',
-		'Cruising',
-		'Submersible',
-		'Aquatic',
+		'Arid',
+		'Rugged',
+		'Hardened',
 		'Hypersonic',
+		'Blazing',
+		'Forged',
 	];
 
 	const A_NOUNS = [
 		'Dreadnought',
-		'Torpedo',
+		'Oasis',
 		'Cruiser',
-		'Destroyer',
+		'Enforcer',
 		'Patrol',
-		'Submarine',
-		'Battleship',
-		'Carrier',
+		'Sandstorm',
+		'Dune',
+		'Titan',
 		'Cargo',
-		'Mast',
+		'Fortress',
 		'Frigate',
+		'Mirage',
 	];
 
 	const select = (a_words: string[]) => a_words[Math.floor(Math.random() * a_words.length)];
@@ -101,7 +122,7 @@
 		// submit launch request
 		const [g_ans,, s_res] = await K_SERVICE.exec('new_game', {
 			token_id: A_TOKEN_LOCATION[2],
-			title: s_title,
+			title: s_title || s_placeholder,
 		}, XG_LIMIT_BASE, '0' === sg_wager_uscrt as string? []: [
 			[sg_wager_uscrt, 'uscrt'],
 		]);
@@ -118,22 +139,6 @@
 			y_neutrino.tx_err(s_res);
 		}
 	};
-
-	const dev_new_game = import.meta.env.DEV
-		? () => {
-			a_games_own = [
-				...a_games_own,
-				{
-					game_id: 'xzy27f14ccbedf89102',
-					title: 'Dev: My New Game',
-					created: (Date.now()*1e3)+'' as Timestamp,
-					wager: {
-						amount: '0' as Uint128,
-						denom: 'uscrt',
-					} as Coin,
-				},
-			];
-		}: void 0;
 
 
 	/* eslint-disable prefer-const */
@@ -152,20 +157,10 @@
 	let dm_error: HTMLDialogElement;
 
 	// list of joinable games
-	let a_games: ListedGame[] = Array(15).fill(
-		{
-			created: ((Date.now() - 5000)*1e3)+'' as Timestamp,
-			title: 'Test',
-			game_id: 'c002f0cd-4053-4eba-9bbb-7295c41db594',
-			wager: {
-				amount: '2000000' as Uint128,
-				denom: 'uscrt',
-			} as Coin,
-		}
-	);
+	let a_games: ListedGame[] = [];
 
 	// own games
-	let a_games_own: ListedGame[] = [];
+	export let a_games_own: ListedGame[] = [];
 
 	let b_loading = false;
 
@@ -237,7 +232,7 @@
 			New Game
 		</button>
 
-		{#if import.meta.env.DEV}
+		<!-- {#if import.meta.env.DEV}
 			<button on:click={dev_new_game}>
 				Dev: Add Game
 			</button>
@@ -247,7 +242,7 @@
 			}}>
 
 			</button>
-		{/if}
+		{/if} -->
 	</div>
 
 	<div>
@@ -316,13 +311,22 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each a_games_own as g_game_own}
-				<Listing g_game={g_game_own} xc_own={1} />
-			{/each}
+			{#if (a_games_own.length + a_games.length) > 0}
+				{#each a_games_own as g_game_own}
+					<Listing g_game={g_game_own} xc_own={1} />
+				{/each}
 
-			{#each a_games as g_game (g_game.game_id)}
-				<Listing {g_game} on:join />
-			{/each}
+				{#each a_games as g_game (g_game.game_id)}
+					<Listing {g_game} on:join />
+				{/each}
+			{:else}
+				<tr>
+					<td style="text-align:center">
+						<!-- svelte-ignore a11y-no-static-element-interactions -->
+						Currently no open games. <span class="link" on:click={() => dm_dialog.showModal()}>Start a new game</span>
+					</td>
+				</tr>
+			{/if}
 		</tbody>
 	</table>
 

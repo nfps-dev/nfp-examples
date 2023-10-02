@@ -96,15 +96,13 @@ The root directory contains the `package.json` for managing the dependencies use
     ```sh
     nfp set-vk "password123"
     nfp package upload dist/app.js
-    nfp package upload dist/storage.js --tags 1.x latest
-    nfp storage owner put 'foo: "bar", baz: 25'
     ```
 
 7. Open the built SVG file in a web browser (`file://` protocol works!) or preview in no-script mode using other means.
 
 8. Configure a COMC host
 
-    If operating offline, or `x.s2r.sh` is not available, run a local COMC host and update your `.env` file accordingly: e.g., `NFP_COMC_HOST="http://localhost:8080/"`. A COMC host is a page served from an HTTP(S) URL that is capable of communicating with Keplr on behalf of the NFP when it is served from the `file://` protocol (Keplr only injects a content-script into HTTP(S) tabs).
+    If operating offline, or `x.s2r.sh` is not available, run a local COMC host and update your `.env` file accordingly: e.g., `NFP_COMC_HOST="http://localhost:8080/"`. A COMC host is a page served from an HTTP(S) URL that is capable of communicating with Keplr/StarShell on behalf of the NFP when it is served from the `file://` protocol (Keplr only injects a content-script into HTTP(S) tabs).
 
 9.  Connect your web extension wallet to the app
 
@@ -113,7 +111,12 @@ The root directory contains the `package.json` for managing the dependencies use
      - reload the page and approve the connection request from the COMC host (e.g., `https://x.s2r.sh` or `http://localhost:8080`)
      - make sure your wallet is funded. for the testnet: https://faucet-ui-pulsar3.vercel.app/
   
-10. Follow instructions to "Grant Allowance". This allows the Neutrino hot hot wallet to pay tx fees using the account of your web wallet.
+10. Ensure the hot wallet is authorized to execute token actions. Follow instructions in the hot wallet UI.
+
+    > While developing, you can use `nfp delegates approve-owner ${HOT_WALLET_ADDRESS}` to authorize the hot wallet. Remember, the hot wallet address is a different address than your web wallet. You can find the hot wallet's address by navigating to "Account Details" from the top-level menu.
+
+11. Follow instructions to "Grant Allowance". This allows the Neutrino hot hot wallet to pay tx fees using the account of your web wallet.
+
 
 
 Outputs:
