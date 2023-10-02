@@ -107,6 +107,39 @@ pub struct ListedGame {
     pub created: Timestamp,
 }
 
+fn ship_found(
+    cells: &Vec<u8>,
+    matched: &mut Vec<bool>,
+    i: &usize,
+    ship_type: u8,
+    ship_size: usize,
+) -> bool {
+    let mut found = false;
+    // check horiz
+    if i % 10 <= 10 - ship_size && 
+       cells[*i..*i+ship_size] == vec![ship_type; ship_size] {
+        for j in 0..ship_size {
+            matched[i+j] = true;
+        }
+        found = true;
+    }
+    // check vert
+    if !found {
+        let mut vertical_cells = vec![];
+        for j in 0..ship_size {
+            vertical_cells.push(cells[i+(j*10)]);
+        }
+        if i / 10 <= 10 - ship_size &&
+           vertical_cells == vec![ship_type; ship_size] {
+            for j in 0..ship_size {
+                matched[i+(j*10)] = true;
+            }
+        }
+        found = true;
+    }
+    found
+}
+
 fn valid_setup(
     cells: &Vec<u8>,
 ) -> bool {
@@ -126,108 +159,53 @@ fn valid_setup(
             if *cell != CellValue::Empty as u8 {
                 if *cell == CellValue::Carrier as u8 {
                     if carrier_found { return false; }
-                    let carrier_size = CARRIER_SIZE as usize;
-                    // check horiz
-                    if i % 10 <= 10 - carrier_size && 
-                       cells[i..i+carrier_size] == vec![CellValue::Carrier as u8; carrier_size] {
-                        for j in 0..carrier_size {
-                            matched[i+j] = true;
-                        }
-                        carrier_found = true;
-                    }
-                    // check vert
-                    if !carrier_found && 
-                       i / 10 <= 10 - carrier_size &&
-                       vec![cells[i], cells[i+10], cells[i+20], cells[i+30], cells[i+40]] == vec![CellValue::Carrier as u8; carrier_size] {
-                        for j in 0..carrier_size {
-                            matched[i+(j*10)] = true;
-                        }
-                        carrier_found = true;
-                    }
+                    carrier_found = ship_found(
+                        cells, 
+                        &mut matched, 
+                        &i, 
+                        CellValue::Carrier as u8, 
+                        CARRIER_SIZE as usize,
+                    );
                     if !carrier_found { return false };
                 } else if *cell == CellValue::Battleship as u8 {
                     if battleship_found { return false; }
-                    let battleship_size = BATTLESHIP_SIZE as usize;
-                    // check horiz
-                    if i % 10 <= 10 - battleship_size && 
-                       cells[i..i+battleship_size] == vec![CellValue::Battleship as u8; battleship_size] {
-                        for j in 0..battleship_size {
-                            matched[i+j] = true;
-                        }
-                        battleship_found = true;
-                    }
-                    // check vert
-                    if !battleship_found && 
-                       i / 10 <= 10 - battleship_size &&
-                       vec![cells[i], cells[i+10], cells[i+20], cells[i+30]] == vec![CellValue::Battleship as u8; battleship_size] {
-                        for j in 0..battleship_size {
-                            matched[i+(j*10)] = true;
-                        }
-                        battleship_found = true;
-                    }
+                    battleship_found = ship_found(
+                        cells, 
+                        &mut matched, 
+                        &i, 
+                        CellValue::Battleship as u8, 
+                        BATTLESHIP_SIZE as usize,
+                    );
                     if !battleship_found { return false };
                 } else if *cell == CellValue::Cruiser as u8 {
                     if cruiser_found { return false; }
-                    let cruiser_size = CRUISER_SIZE as usize;
-                    // check horiz
-                    if i % 10 <= 10 - cruiser_size && 
-                       cells[i..i+cruiser_size] == vec![CellValue::Cruiser as u8; cruiser_size] {
-                        for j in 0..cruiser_size {
-                            matched[i+j] = true;
-                        }
-                        cruiser_found = true;
-                    }
-                    // check vert
-                    if !cruiser_found && 
-                       i / 10 <= 10 - cruiser_size &&
-                       vec![cells[i], cells[i+10], cells[i+20]] == vec![CellValue::Cruiser as u8; cruiser_size] {
-                        for j in 0..cruiser_size {
-                            matched[i+(j*10)] = true;
-                        }
-                        cruiser_found = true;
-                    }
+                    cruiser_found = ship_found(
+                        cells, 
+                        &mut matched, 
+                        &i, 
+                        CellValue::Cruiser as u8, 
+                        CRUISER_SIZE as usize,
+                    );
                     if !cruiser_found { return false };
                 } else if *cell == CellValue::Submarine as u8 {
                     if submarine_found { return false; }
-                    let submarine_size = SUBMARINE_SIZE as usize;
-                    // check horiz
-                    if i % 10 <= 10 - submarine_size && 
-                       cells[i..i+submarine_size] == vec![CellValue::Submarine as u8; submarine_size] {
-                        for j in 0..submarine_size {
-                            matched[i+j] = true;
-                        }
-                        submarine_found = true;
-                    }
-                    // check vert
-                    if !submarine_found && 
-                       i / 10 <= 10 - submarine_size &&
-                       vec![cells[i], cells[i+10], cells[i+20]] == vec![CellValue::Submarine as u8; submarine_size] {
-                        for j in 0..submarine_size {
-                            matched[i+(j*10)] = true;
-                        }
-                        submarine_found = true;
-                    }
+                    submarine_found = ship_found(
+                        cells, 
+                        &mut matched, 
+                        &i, 
+                        CellValue::Submarine as u8, 
+                        SUBMARINE_SIZE as usize,
+                    );
                     if !submarine_found { return false };
                 } else if *cell == CellValue::Destroyer as u8 {
                     if destroyer_found { return false; }
-                    let destroyer_size = DESTROYER_SIZE as usize;
-                    // check horiz
-                    if i % 10 <= 10 - destroyer_size && 
-                       cells[i..i+destroyer_size] == vec![CellValue::Destroyer as u8; destroyer_size] {
-                        for j in 0..destroyer_size {
-                            matched[i+j] = true;
-                        }
-                        destroyer_found = true;
-                    }
-                    // check vert
-                    if !destroyer_found && 
-                       i / 10 <= 10 - destroyer_size &&
-                       vec![cells[i], cells[i+10]] == vec![CellValue::Destroyer as u8; destroyer_size] {
-                        for j in 0..destroyer_size {
-                            matched[i+(j*10)] = true;
-                        }
-                        destroyer_found = true;
-                    }
+                    destroyer_found = ship_found(
+                        cells, 
+                        &mut matched, 
+                        &i, 
+                        CellValue::Destroyer as u8, 
+                        DESTROYER_SIZE as usize,
+                    );
                     if !destroyer_found { return false };
                 } else {
                     return false;
