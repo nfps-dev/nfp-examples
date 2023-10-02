@@ -975,13 +975,15 @@ pub fn attack_cell(
     // get notification id for recipient (opponent owner)
     let id = notification_id(deps.storage, &opponent_owner, &channel)?;
 
+    let turn = TURN_STATE_STORE
+        .add_suffix(game_id.as_bytes())
+        .load(deps.storage)?;
+
     // use CBOR to encode data
     let data = cbor::to_vec(&(
         game_id.clone(),
         opponent_home,
-        TURN_STATE_STORE
-            .add_suffix(game_id.as_bytes())
-            .load(deps.storage)?,
+        turn,
     )).map_err(|e| 
         StdError::generic_err(format!("{:?}", e))
     )?;
@@ -1002,7 +1004,7 @@ pub fn attack_cell(
     if winner {
         response = Response::new()
             .set_data(
-                to_binary(&ExecuteAnswer::AttackCell { away }
+                to_binary(&ExecuteAnswer::AttackCell { away, turn }
             )?)        
             .add_message(CosmosMsg::Bank(BankMsg::Send {
                 to_address: sender.clone().into_string(),
@@ -1020,7 +1022,7 @@ pub fn attack_cell(
     } else {
         response = Response::new()
             .set_data(
-                to_binary(&ExecuteAnswer::AttackCell { away }
+                to_binary(&ExecuteAnswer::AttackCell { away, turn }
             )?)
             .add_attribute_plaintext(
                 id.to_base64(), 
