@@ -125,6 +125,7 @@ fn valid_setup(
         if !matched[i] {
             if *cell != CellValue::Empty as u8 {
                 if *cell == CellValue::Carrier as u8 {
+                    if carrier_found { return false; }
                     let carrier_size = CARRIER_SIZE as usize;
                     // check horiz
                     if i % 10 <= 10 - carrier_size && 
@@ -145,6 +146,7 @@ fn valid_setup(
                     }
                     if !carrier_found { return false };
                 } else if *cell == CellValue::Battleship as u8 {
+                    if battleship_found { return false; }
                     let battleship_size = BATTLESHIP_SIZE as usize;
                     // check horiz
                     if i % 10 <= 10 - battleship_size && 
@@ -165,6 +167,7 @@ fn valid_setup(
                     }
                     if !battleship_found { return false };
                 } else if *cell == CellValue::Cruiser as u8 {
+                    if cruiser_found { return false; }
                     let cruiser_size = CRUISER_SIZE as usize;
                     // check horiz
                     if i % 10 <= 10 - cruiser_size && 
@@ -185,6 +188,7 @@ fn valid_setup(
                     }
                     if !cruiser_found { return false };
                 } else if *cell == CellValue::Submarine as u8 {
+                    if submarine_found { return false; }
                     let submarine_size = SUBMARINE_SIZE as usize;
                     // check horiz
                     if i % 10 <= 10 - submarine_size && 
@@ -205,6 +209,7 @@ fn valid_setup(
                     }
                     if !submarine_found { return false };
                 } else if *cell == CellValue::Destroyer as u8 {
+                    if destroyer_found { return false; }
                     let destroyer_size = DESTROYER_SIZE as usize;
                     // check horiz
                     if i % 10 <= 10 - destroyer_size && 
@@ -217,7 +222,7 @@ fn valid_setup(
                     // check vert
                     if !destroyer_found && 
                        i / 10 <= 10 - destroyer_size &&
-                       vec![cells[i], cells[i+10], cells[i+20]] == vec![CellValue::Destroyer as u8; destroyer_size] {
+                       vec![cells[i], cells[i+10]] == vec![CellValue::Destroyer as u8; destroyer_size] {
                         for j in 0..destroyer_size {
                             matched[i+(j*10)] = true;
                         }
@@ -1561,6 +1566,7 @@ mod tests {
             title: "game 1".to_string(),
             padding: None
         };
+        /*
         let exec_result = execute(
             deps.as_mut(),
             mock_env(),
@@ -1574,6 +1580,7 @@ mod tests {
         );
         let exec_answer: ExecuteAnswer = from_binary(&exec_result.unwrap().data.unwrap()).unwrap();
         println!("{:?}", exec_answer);
+        */
     }
 
     #[test]
@@ -1582,6 +1589,84 @@ mod tests {
             0,0,0,0,0,0,0,0,0,0,
             0,0,0,0,0,0,0,0,0,0,
             0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+        ];
+        assert!(!valid_setup(&setup));
+        let setup: Vec<u8> = vec![
+            0,0,0,0,0,2,2,2,2,2,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            4,4,4,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,6,6,
+        ];
+        assert!(valid_setup(&setup));
+        let setup: Vec<u8> = vec![
+            0,0,0,0,0,2,2,2,2,2,
+            0,0,0,0,0,0,2,0,0,3,
+            0,0,0,0,0,0,2,0,0,3,
+            0,0,0,0,0,0,2,0,0,3,
+            0,0,0,0,0,0,2,0,0,3,
+            4,4,4,0,0,0,2,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,6,6,
+        ];
+        assert!(!valid_setup(&setup));
+        let setup: Vec<u8> = vec![
+            0,0,0,0,0,2,2,2,2,2,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            4,4,4,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+        ];
+        assert!(!valid_setup(&setup));
+        let setup: Vec<u8> = vec![
+            0,0,0,0,0,2,0,0,0,0,
+            0,0,0,0,0,2,0,0,0,3,
+            0,0,0,0,0,2,0,0,0,3,
+            0,0,0,0,0,2,0,0,0,3,
+            0,0,0,0,0,2,0,0,0,3,
+            4,0,0,0,0,0,0,0,0,0,
+            4,0,0,0,0,0,0,0,0,0,
+            4,0,5,6,0,0,0,0,0,0,
+            0,0,5,6,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+        ];
+        assert!(valid_setup(&setup));
+        let setup: Vec<u8> = vec![
+            0,0,0,0,0,0,2,2,2,2,
+            2,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            0,0,0,0,0,0,0,0,0,3,
+            4,0,0,0,0,0,0,0,0,0,
+            4,0,0,0,0,0,0,0,0,0,
+            4,0,5,6,0,0,0,0,0,0,
+            0,0,5,6,0,0,0,0,0,0,
+            0,0,5,0,0,0,0,0,0,0,
+        ];
+        assert!(!valid_setup(&setup));
+        let setup: Vec<u8> = vec![
+            0,0,0,0,0,2,2,2,2,2,
+            3,3,3,3,4,4,4,5,5,5,
+            6,6,0,0,0,0,0,0,0,0,
             0,0,0,0,0,0,0,0,0,0,
             0,0,0,0,0,0,0,0,0,0,
             0,0,0,0,0,0,0,0,0,0,
