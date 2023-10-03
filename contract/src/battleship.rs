@@ -1099,7 +1099,7 @@ pub fn claim_victory(
         return Err(StdError::generic_err("Cannot claim victory this turn"));
     }
 
-    let bank_msg: CosmosMsg;
+    let mut bank_msgs: Vec<CosmosMsg> = vec![];
     let mut id: Option<Binary> = None;
     let mut encrypted_data: Option<Binary> = None;
     if initiator && turn == TurnState::WaitingForPlayer as u8 {
@@ -1117,15 +1117,17 @@ pub fn claim_victory(
         FINISHED_GAMES_STORE
             .insert(deps.storage, &game_id, &listed_game)?;
 
-        bank_msg = CosmosMsg::Bank(BankMsg::Send {
-            to_address: sender.clone().into_string(),
-            amount: vec![
-                Coin {
-                    denom: "uscrt".to_string(),
-                    amount: Uint128::from(listed_game.wager),
-                }
-            ],
-        });
+        if listed_game.wager > 0 {
+            bank_msgs.push(CosmosMsg::Bank(BankMsg::Send {
+                to_address: sender.clone().into_string(),
+                amount: vec![
+                    Coin {
+                        denom: "uscrt".to_string(),
+                        amount: Uint128::from(listed_game.wager),
+                    }
+                ],
+            }));
+        }
     } else {
         let time = env.block.time.seconds();
         let last_move_time = LAST_MOVE_TIME_STORE
@@ -1174,15 +1176,17 @@ pub fn claim_victory(
         FINISHED_GAMES_STORE
             .insert(deps.storage, &game_id, &listed_game)?;
 
-        bank_msg = CosmosMsg::Bank(BankMsg::Send {
-            to_address: sender.clone().into_string(),
-            amount: vec![
-                Coin {
-                    denom: "uscrt".to_string(),
-                    amount: Uint128::from(listed_game.wager * 2),
-                }
-            ],
-        });
+        if listed_game.wager > 0 {
+            bank_msgs.push(CosmosMsg::Bank(BankMsg::Send {
+                to_address: sender.clone().into_string(),
+                amount: vec![
+                    Coin {
+                        denom: "uscrt".to_string(),
+                        amount: Uint128::from(listed_game.wager * 2 - 1000000_u128),
+                    }
+                ],
+            }));
+        }
 
         // handle snip-52 channel data
         let channel = GAME_UPDATED_CHANNEL_ID.to_string();
@@ -1221,7 +1225,7 @@ pub fn claim_victory(
             .set_data(to_binary(&ExecuteAnswer::ClaimVictory { 
                 status: ResponseStatus::Success 
             })?)
-            .add_messages(if listed_game.wager == 0 { vec![] } else { vec![bank_msg] })
+            .add_messages(bank_msgs)
             .add_attribute_plaintext(
                 id.unwrap().to_base64(), 
                 encrypted_data.unwrap().to_base64()
@@ -1231,7 +1235,7 @@ pub fn claim_victory(
             .set_data(to_binary(&ExecuteAnswer::ClaimVictory { 
                 status: ResponseStatus::Success 
             })?)
-            .add_messages(if listed_game.wager == 0 { vec![] } else { vec![bank_msg] })
+            .add_messages(bank_msgs)
     }
 
     Ok(response)
