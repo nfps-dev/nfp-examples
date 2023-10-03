@@ -1009,12 +1009,14 @@ pub fn attack_cell(
             )?)        
             .add_message(CosmosMsg::Bank(BankMsg::Send {
                 to_address: sender.clone().into_string(),
-                amount: vec![
-                    Coin {
-                        denom: "uscrt".to_string(),
-                        amount: Uint128::from(listed_game.wager * 2),
-                    }
-                ],
+                amount: if listed_game.wager == 0 { vec![] } else {
+                    vec![
+                        Coin {
+                            denom: "uscrt".to_string(),
+                            amount: Uint128::from((listed_game.wager * 2) - 1),
+                        }
+                    ]
+                },
             }))
             .add_attribute_plaintext(
                 id.to_base64(), 
