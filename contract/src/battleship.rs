@@ -1013,7 +1013,7 @@ pub fn attack_cell(
                     vec![
                         Coin {
                             denom: "uscrt".to_string(),
-                            amount: Uint128::from((listed_game.wager * 2) - 1),
+                            amount: Uint128::from((listed_game.wager * 2) - 1000000_u128),
                         }
                     ]
                 },
