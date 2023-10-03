@@ -159,19 +159,6 @@ pub enum ExecuteMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// add/remove approval(s) that whitelist everyone (makes public)
-    SetGlobalApproval {
-        /// optional token id to apply approval/revocation to
-        token_id: Option<String>,
-        /// optional permission level for viewing the owner
-        view_owner: Option<AccessLevel>,
-        /// optional permission level for viewing private metadata
-        view_private_metadata: Option<AccessLevel>,
-        /// optional expiration
-        expires: Option<Expiration>,
-        /// optional message length padding
-        padding: Option<String>,
-    },
     /// add/remove approval(s) for a specific address on the token(s) you own.  Any permissions
     /// that are omitted will keep the current permission setting for that whitelist address
     SetWhitelistedApproval {
@@ -589,9 +576,6 @@ pub enum ExecuteAnswer {
     RevokeAll {
         status: ResponseStatus,
     },
-    SetGlobalApproval {
-        status: ResponseStatus,
-    },
     SetWhitelistedApproval {
         status: ResponseStatus,
     },
@@ -905,16 +889,6 @@ pub enum QueryMsg {
         /// optional viewing key
         viewing_key: Option<String>,
     },
-    /// verify that the specified address has approval to transfer every listed token.
-    /// A token will count as unapproved if it is non-transferable
-    VerifyTransferApproval {
-        /// list of tokens to verify approval for
-        token_ids: Vec<String>,
-        /// address that has approval
-        address: String,
-        /// viewing key
-        viewing_key: String,
-    },
     /// display the transaction history for the specified address in reverse
     /// chronological order
     TransactionHistory {
@@ -1198,10 +1172,6 @@ pub enum QueryAnswer {
     ApprovedForAll {
         operators: Vec<Cw721Approval>,
     },
-    VerifyTransferApproval {
-        approved_for_all: bool,
-        first_unapproved_token: Option<String>,
-    },
     TransactionHistory {
         /// total transaction count
         total: u64,
@@ -1347,12 +1317,6 @@ pub enum QueryWithPermit {
         /// optionally include expired Approvals in the response list.  If ommitted or
         /// false, expired Approvals will be filtered out of the response
         include_expired: Option<bool>,
-    },
-    /// verify that the permit creator has approval to transfer every listed token.
-    /// A token will count as unapproved if it is non-transferable
-    VerifyTransferApproval {
-        /// list of tokens to verify approval for
-        token_ids: Vec<String>,
     },
     /// display the transaction history for the permit creator in reverse
     /// chronological order

@@ -1,5 +1,5 @@
 use hkdf::{hmac::Hmac, Hkdf};
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use chacha20poly1305::{
     aead::{AeadInPlace, KeyInit,},
     ChaCha20Poly1305,
@@ -41,6 +41,7 @@ pub fn hkdf_sha_256(salt: &Option<Vec<u8>>, ikm: &[u8], info: &[u8]) -> StdResul
     }
 }
 
+/*
 pub fn sha_256(data: &[u8]) -> [u8; SHA256_HASH_SIZE] {
     let mut hasher = Sha256::new();
     hasher.update(data);
@@ -50,3 +51,4 @@ pub fn sha_256(data: &[u8]) -> [u8; SHA256_HASH_SIZE] {
     result.copy_from_slice(hash.as_slice());
     result
 }
+*/

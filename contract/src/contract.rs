@@ -239,23 +239,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             &config,
             ContractStatus::StopTransactions.to_u8(),
         ),
-        ExecuteMsg::SetGlobalApproval {
-            token_id,
-            view_owner,
-            view_private_metadata,
-            expires,
-            ..
-        } => set_global_approval(
-            deps,
-            &env,
-            &info.sender,
-            &config,
-            ContractStatus::StopTransactions.to_u8(),
-            token_id,
-            view_owner,
-            view_private_metadata,
-            expires,
-        ),
         ExecuteMsg::SetWhitelistedApproval {
             address,
             token_id,
@@ -796,92 +779,6 @@ pub fn make_owner_private(
     }
     Ok(
         Response::new().set_data(to_binary(&ExecuteAnswer::MakeOwnershipPrivate {
-            status: Success,
-        })?),
-    )
-}
-
-/// Returns StdResult<Response>
-///
-/// adds/revokes access for everyone
-///
-/// # Arguments
-///
-/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - a reference to the Env of contract's environment
-/// * `sender` - a reference to the message sender address
-/// * `config` - a reference to the Config
-/// * `priority` - u8 representation of highest status level this action is permitted at
-/// * `token_id` - optional token id to apply approvals to
-/// * `view_owner` - optional access level for viewing token ownership
-/// * `view_private_metadata` - optional access level for viewing private metadata
-/// * `expires` - optional Expiration for this approval
-#[allow(clippy::too_many_arguments)]
-pub fn set_global_approval(
-    deps: DepsMut,
-    env: &Env,
-    sender: &Addr,
-    config: &Config,
-    priority: u8,
-    token_id: Option<String>,
-    view_owner: Option<AccessLevel>,
-    view_private_metadata: Option<AccessLevel>,
-    expires: Option<Expiration>,
-) -> StdResult<Response> {
-    check_status(config.status, priority)?;
-    let token_given: bool;
-    // use this "address" to represent global permission
-    let global_raw = CanonicalAddr(Binary::from(b"public"));
-    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    let mut custom_err = String::new();
-    let (token, idx) = if let Some(id) = token_id {
-        token_given = true;
-        custom_err = format!("You do not own token {}", id);
-        // if token supply is private, don't leak that the token id does not exist
-        // instead just say they do not own that token
-        let opt_err = if config.token_supply_is_public {
-            None
-        } else {
-            Some(&*custom_err)
-        };
-        get_token(deps.storage, &id, opt_err)?
-    } else {
-        token_given = false;
-        (
-            Token {
-                owner: sender_raw.clone(),
-                permissions: Vec::new(),
-                unwrapped: false,
-                transferable: true,
-            },
-            0,
-        )
-    };
-    // if trying to set token permissions when you are not the owner
-    if token_given && token.owner != sender_raw {
-        return Err(StdError::generic_err(custom_err));
-    }
-    let mut accesses: [Option<AccessLevel>; 3] = [None, None, None];
-    accesses[PermissionType::ViewOwner.to_usize()] = view_owner;
-    accesses[PermissionType::ViewMetadata.to_usize()] = view_private_metadata;
-    let mut proc_info = ProcessAccInfo {
-        token,
-        idx,
-        token_given,
-        accesses,
-        expires,
-        from_oper: false,
-    };
-    process_accesses(
-        deps.storage,
-        env,
-        &global_raw,
-        &sender_raw,
-        &mut proc_info,
-        None,
-    )?;
-    Ok(
-        Response::new().set_data(to_binary(&ExecuteAnswer::SetGlobalApproval {
             status: Success,
         })?),
     )
@@ -1934,17 +1831,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             viewing_key.as_deref(),
             None,
         ),
-        QueryMsg::VerifyTransferApproval {
-            token_ids,
-            address,
-            viewing_key,
-        } => {
-            let viewer = Some(ViewerInfo {
-                address,
-                viewing_key,
-            });
-            query_verify_approval(deps, &env.block, token_ids, viewer, None)
-        }
         QueryMsg::TransactionHistory {
             address,
             viewing_key,
@@ -2126,9 +2012,6 @@ pub fn permit_queries(
         } => query_all_nft_info(deps, block, &token_id, None, include_expired, Some(querier)),
         QueryWithPermit::InventoryApprovals { include_expired } => {
             query_inventory_approvals(deps, block, None, include_expired, Some(querier))
-        }
-        QueryWithPermit::VerifyTransferApproval { token_ids } => {
-            query_verify_approval(deps, block, token_ids, None, Some(querier))
         }
         QueryWithPermit::TransactionHistory { page, page_size } => {
             query_transactions(deps, None, page, page_size, Some(querier))
@@ -3094,63 +2977,6 @@ pub fn query_transactions(
         page_size.unwrap_or(30),
     )?;
     to_binary(&QueryAnswer::TransactionHistory { total, txs })
-}
-
-/// Returns StdResult<Binary> after verifying that the specified address has transfer approval
-/// for all the listed tokens.  A token will count as unapproved if it is non-transferable
-///
-/// # Arguments
-///
-/// * `deps` - a reference to Extern containing all the contract's external dependencies
-/// * `block` - a reference to the BlockInfo
-/// * `token_ids` - a list of token ids to check if the address has transfer approval
-/// * `viewer` - optional address and key making an authenticated query request
-/// * `from_permit` - address derived from an Owner permit, if applicable
-pub fn query_verify_approval(
-    deps: Deps,
-    block: &BlockInfo,
-    token_ids: Vec<String>,
-    viewer: Option<ViewerInfo>,
-    from_permit: Option<CanonicalAddr>,
-) -> StdResult<Binary> {
-    let address_raw = get_querier(deps, viewer, from_permit)?.ok_or_else(|| {
-        StdError::generic_err("This is being called incorrectly if there is no querier address")
-    })?;
-    let config: Config = load(deps.storage, CONFIG_KEY)?;
-    let mut oper_for: Vec<CanonicalAddr> = Vec::new();
-    for id in token_ids.into_iter() {
-        // cargo fmt creates the and_then block, but clippy doesn't like it
-        #[allow(clippy::blocks_in_if_conditions)]
-        if get_token_if_permitted(
-            deps,
-            block,
-            &id,
-            Some(&address_raw),
-            PermissionType::Transfer,
-            &mut oper_for,
-            &config,
-            // the and_then forces an error if the token is not transferable
-        )
-        .and_then(|(t, _)| {
-            if t.transferable {
-                Ok(())
-            } else {
-                // the msg is never seen
-                Err(StdError::generic_err(""))
-            }
-        })
-        .is_err()
-        {
-            return to_binary(&QueryAnswer::VerifyTransferApproval {
-                approved_for_all: false,
-                first_unapproved_token: Some(id),
-            });
-        }
-    }
-    to_binary(&QueryAnswer::VerifyTransferApproval {
-        approved_for_all: true,
-        first_unapproved_token: None,
-    })
 }
 
 /// Returns StdResult<Binary> displaying the registered code hash of the specified contract if

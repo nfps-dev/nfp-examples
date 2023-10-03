@@ -1,10 +1,11 @@
 use bech32::ToBase32;
 use hkdf::hmac::Mac;
 use cosmwasm_std::{DepsMut, Env, Addr, StdResult, Response, StdError, to_binary, Api, Storage, CanonicalAddr, Binary, Deps, Uint64};
+use secret_toolkit::crypto::sha_256;
 use crate::snip52_channel::{CHANNELS, CHANNEL_SCHEMATA};
 use crate::snip52_signed_doc::{SignedDocument, pubkey_to_account, Document};
 use crate::snip52_state::{get_seed, store_seed, get_count};
-use crate::snip52_crypto::{sha_256, HmacSha256, cipher_data};
+use crate::snip52_crypto::{HmacSha256, cipher_data};
 use crate::msg::{ExecuteAnswer, QueryAnswer, ChannelInfo, ChannelMode};
 
 pub const DATA_LEN: usize = 256;

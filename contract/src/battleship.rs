@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 use minicbor_ser as cbor;
+use base64::{engine::general_purpose, Engine};
 use secret_toolkit::{storage::{Keyset, Item, Keymap}, crypto::ContractPrng};
 use serde::{Deserialize, Serialize};
 use schemars::JsonSchema;
@@ -293,7 +294,7 @@ pub fn new_game(
     // coin flip using vrf to see who goes first
     let mut prng = ContractPrng::from_env(&env);
     let initiator_goes_first = prng.rand_bytes()[0] & 2 == 0;
-    let game_id = base32::encode(base32::Alphabet::Crockford, &prng.rand_bytes());
+    let game_id = general_purpose::STANDARD.encode(&prng.rand_bytes());
 
     LISTED_GAMES_STORE.insert(
         deps.storage, 
