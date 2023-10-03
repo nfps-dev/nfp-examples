@@ -661,6 +661,26 @@ fn has_won(
     false
 }
 
+fn record_hit(
+    away: &mut StoredAway,
+    home: &mut Vec<u8>,
+    cell: usize,
+    ship_type: u8,
+    ship_size: u8,
+) -> () {
+    away.away_values[cell] |= CellValue::Hit as u8;
+    away.carrier_hits += 1;
+    if away.carrier_hits == ship_size {
+        // the carrier has been sunk, reveal the type
+        for (i, value) in home.iter().enumerate() {
+            if *value & ship_type == ship_type {
+                away.away_values[i] |= ship_type;
+            }
+        }
+    }
+    home[cell] |= CellValue::Hit as u8;
+}
+
 pub fn attack_cell(
     deps: DepsMut,
     env: Env,
@@ -728,65 +748,45 @@ pub fn attack_cell(
                         initiator_away.away_values[cell] = CellValue::Miss as u8;
                         joiner_home[cell] = CellValue::Miss as u8;
                     } else if opponent_cell_value == CellValue::Carrier as u8 {
-                        initiator_away.away_values[cell] |= CellValue::Hit as u8;
-                        initiator_away.carrier_hits += 1;
-                        if initiator_away.carrier_hits == CARRIER_SIZE {
-                            // the carrier has been sunk, reveal the type
-                            for value in &mut initiator_away.away_values {
-                                if *value == CellValue::Carrier as u8 {
-                                    *value |= CellValue::Carrier as u8;
-                                }
-                            }
-                        }
-                        joiner_home[cell] |= CellValue::Hit as u8;
+                        record_hit(
+                            &mut initiator_away,
+                            &mut joiner_home,
+                            cell,
+                            CellValue::Carrier as u8,
+                            CARRIER_SIZE
+                        );
                     } else if opponent_cell_value == CellValue::Battleship as u8 {
-                        initiator_away.away_values[cell] |= CellValue::Hit as u8;
-                        initiator_away.battleship_hits += 1;
-                        if initiator_away.battleship_hits == BATTLESHIP_SIZE {
-                            // the battleship has been sunk, reveal the type
-                            for value in &mut initiator_away.away_values {
-                                if *value == CellValue::Battleship as u8 {
-                                    *value |= CellValue::Battleship as u8;
-                                }
-                            }
-                        }
-                        joiner_home[cell] |= CellValue::Hit as u8;
+                        record_hit(
+                            &mut initiator_away,
+                            &mut joiner_home,
+                            cell,
+                            CellValue::Battleship as u8,
+                            BATTLESHIP_SIZE
+                        );
                     } else if opponent_cell_value == CellValue::Cruiser as u8 {
-                        initiator_away.away_values[cell] |= CellValue::Hit as u8;
-                        initiator_away.cruiser_hits += 1;
-                        if initiator_away.cruiser_hits == CRUISER_SIZE {
-                            // the cruiser has been sunk, reveal the type
-                            for value in &mut initiator_away.away_values {
-                                if *value == CellValue::Cruiser as u8 {
-                                    *value |= CellValue::Cruiser as u8;
-                                }
-                            }
-                        }
-                        joiner_home[cell] |= CellValue::Hit as u8;
+                        record_hit(
+                            &mut initiator_away,
+                            &mut joiner_home,
+                            cell,
+                            CellValue::Cruiser as u8,
+                            CRUISER_SIZE
+                        );
                     } else if opponent_cell_value == CellValue::Submarine as u8 {
-                        initiator_away.away_values[cell] |= CellValue::Hit as u8;
-                        initiator_away.submarine_hits += 1;
-                        if initiator_away.submarine_hits == SUBMARINE_SIZE {
-                            // the submarine has been sunk, reveal the type
-                            for value in &mut initiator_away.away_values {
-                                if *value == CellValue::Submarine as u8 {
-                                    *value |= CellValue::Submarine as u8;
-                                }
-                            }
-                        }
-                        joiner_home[cell] |= CellValue::Hit as u8;
+                        record_hit(
+                            &mut initiator_away,
+                            &mut joiner_home,
+                            cell,
+                            CellValue::Submarine as u8,
+                            SUBMARINE_SIZE
+                        );  
                     } else if opponent_cell_value == CellValue::Destroyer as u8 {
-                        initiator_away.away_values[cell] |= CellValue::Hit as u8;
-                        initiator_away.destroyer_hits += 1;
-                        if initiator_away.destroyer_hits == DESTROYER_SIZE {
-                            // the destroyer has been sunk, reveal the type
-                            for value in &mut initiator_away.away_values {
-                                if *value == CellValue::Destroyer as u8 {
-                                    *value |= CellValue::Destroyer as u8;
-                                }
-                            }
-                        }
-                        joiner_home[cell] |= CellValue::Hit as u8;
+                        record_hit(
+                            &mut initiator_away,
+                            &mut joiner_home,
+                            cell,
+                            CellValue::Destroyer as u8,
+                            DESTROYER_SIZE
+                        );  
                     } else {
                         return Err(StdError::generic_err("Invalid cell value"));
                     }
@@ -854,65 +854,45 @@ pub fn attack_cell(
                         joiner_away.away_values[cell] = CellValue::Miss as u8;
                         initiator_home[cell] = CellValue::Miss as u8;
                     } else if opponent_cell_value == CellValue::Carrier as u8 {
-                        joiner_away.away_values[cell] |= CellValue::Hit as u8;
-                        joiner_away.carrier_hits += 1;
-                        if joiner_away.carrier_hits == CARRIER_SIZE {
-                            // the carrier has been sunk, reveal the type
-                            for value in &mut joiner_away.away_values {
-                                if *value == CellValue::Carrier as u8 {
-                                    *value |= CellValue::Carrier as u8;
-                                }
-                            }
-                        }
-                        initiator_home[cell] |= CellValue::Hit as u8;
+                        record_hit(
+                            &mut joiner_away,
+                            &mut initiator_home,
+                            cell,
+                            CellValue::Carrier as u8,
+                            CARRIER_SIZE
+                        );
                     } else if opponent_cell_value == CellValue::Battleship as u8 {
-                        joiner_away.away_values[cell] |= CellValue::Hit as u8;
-                        joiner_away.battleship_hits += 1;
-                        if joiner_away.battleship_hits == BATTLESHIP_SIZE {
-                            // the battleship has been sunk, reveal the type
-                            for value in &mut joiner_away.away_values {
-                                if *value == CellValue::Battleship as u8 {
-                                    *value |= CellValue::Battleship as u8;
-                                }
-                            }
-                        }
-                        initiator_home[cell] |= CellValue::Hit as u8;
+                        record_hit(
+                            &mut joiner_away,
+                            &mut initiator_home,
+                            cell,
+                            CellValue::Battleship as u8,
+                            BATTLESHIP_SIZE
+                        );
                     } else if opponent_cell_value == CellValue::Cruiser as u8 {
-                        joiner_away.away_values[cell] |= CellValue::Hit as u8;
-                        joiner_away.cruiser_hits += 1;
-                        if joiner_away.cruiser_hits == CRUISER_SIZE {
-                            // the cruiser has been sunk, reveal the type
-                            for value in &mut joiner_away.away_values {
-                                if *value == CellValue::Cruiser as u8 {
-                                    *value |= CellValue::Cruiser as u8;
-                                }
-                            }
-                        }
-                        initiator_home[cell] |= CellValue::Hit as u8;
+                        record_hit(
+                            &mut joiner_away,
+                            &mut initiator_home,
+                            cell,
+                            CellValue::Cruiser as u8,
+                            CRUISER_SIZE
+                        );
                     } else if opponent_cell_value == CellValue::Submarine as u8 {
-                        joiner_away.away_values[cell] |= CellValue::Hit as u8;
-                        joiner_away.submarine_hits += 1;
-                        if joiner_away.submarine_hits == SUBMARINE_SIZE {
-                            // the submarine has been sunk, reveal the type
-                            for value in &mut joiner_away.away_values {
-                                if *value == CellValue::Submarine as u8 {
-                                    *value |= CellValue::Submarine as u8;
-                                }
-                            }
-                        }
-                        initiator_home[cell] |= CellValue::Hit as u8;
+                        record_hit(
+                            &mut joiner_away,
+                            &mut initiator_home,
+                            cell,
+                            CellValue::Submarine as u8,
+                            SUBMARINE_SIZE
+                        );  
                     } else if opponent_cell_value == CellValue::Destroyer as u8 {
-                        joiner_away.away_values[cell] |= CellValue::Hit as u8;
-                        joiner_away.destroyer_hits += 1;
-                        if joiner_away.destroyer_hits == DESTROYER_SIZE {
-                            // the destroyer has been sunk, reveal the type
-                            for value in &mut joiner_away.away_values {
-                                if *value == CellValue::Destroyer as u8 {
-                                    *value |= CellValue::Destroyer as u8;
-                                }
-                            }
-                        }
-                        initiator_home[cell] |= CellValue::Hit as u8;
+                        record_hit(
+                            &mut joiner_away,
+                            &mut initiator_home,
+                            cell,
+                            CellValue::Destroyer as u8,
+                            DESTROYER_SIZE
+                        );
                     } else {
                         return Err(StdError::generic_err("Invalid cell value"));
                     }
@@ -1002,7 +982,7 @@ pub fn attack_cell(
     increment_count(deps.storage, &channel, &opponent_owner)?;
 
     let response: Response;
-    if winner {
+    if winner && listed_game.wager > 0_u128 {
         response = Response::new()
             .set_data(
                 to_binary(&ExecuteAnswer::AttackCell { away, turn }
