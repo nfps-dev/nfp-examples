@@ -777,7 +777,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Carrier as u8,
                             CARRIER_SIZE
-                        );
+                        )?;
                     } else if opponent_cell_value == CellValue::Battleship as u8 {
                         record_hit(
                             &mut initiator_away,
@@ -785,7 +785,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Battleship as u8,
                             BATTLESHIP_SIZE
-                        );
+                        )?;
                     } else if opponent_cell_value == CellValue::Cruiser as u8 {
                         record_hit(
                             &mut initiator_away,
@@ -793,7 +793,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Cruiser as u8,
                             CRUISER_SIZE
-                        );
+                        )?;
                     } else if opponent_cell_value == CellValue::Submarine as u8 {
                         record_hit(
                             &mut initiator_away,
@@ -801,7 +801,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Submarine as u8,
                             SUBMARINE_SIZE
-                        );  
+                        )?;  
                     } else if opponent_cell_value == CellValue::Destroyer as u8 {
                         record_hit(
                             &mut initiator_away,
@@ -809,7 +809,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Destroyer as u8,
                             DESTROYER_SIZE
-                        );  
+                        )?;  
                     } else {
                         return Err(StdError::generic_err("Invalid cell value"));
                     }
@@ -883,7 +883,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Carrier as u8,
                             CARRIER_SIZE
-                        );
+                        )?;
                     } else if opponent_cell_value == CellValue::Battleship as u8 {
                         record_hit(
                             &mut joiner_away,
@@ -891,7 +891,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Battleship as u8,
                             BATTLESHIP_SIZE
-                        );
+                        )?;
                     } else if opponent_cell_value == CellValue::Cruiser as u8 {
                         record_hit(
                             &mut joiner_away,
@@ -899,7 +899,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Cruiser as u8,
                             CRUISER_SIZE
-                        );
+                        )?;
                     } else if opponent_cell_value == CellValue::Submarine as u8 {
                         record_hit(
                             &mut joiner_away,
@@ -907,7 +907,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Submarine as u8,
                             SUBMARINE_SIZE
-                        );  
+                        )?;  
                     } else if opponent_cell_value == CellValue::Destroyer as u8 {
                         record_hit(
                             &mut joiner_away,
@@ -915,7 +915,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Destroyer as u8,
                             DESTROYER_SIZE
-                        );
+                        )?;
                     } else {
                         return Err(StdError::generic_err("Invalid cell value"));
                     }
@@ -1221,7 +1221,7 @@ pub fn claim_victory(
             .set_data(to_binary(&ExecuteAnswer::ClaimVictory { 
                 status: ResponseStatus::Success 
             })?)
-            .add_message(bank_msg)
+            .add_messages(if listed_game.wager == 0 { vec![] } else { vec![bank_msg] })
             .add_attribute_plaintext(
                 id.unwrap().to_base64(), 
                 encrypted_data.unwrap().to_base64()
@@ -1231,7 +1231,7 @@ pub fn claim_victory(
             .set_data(to_binary(&ExecuteAnswer::ClaimVictory { 
                 status: ResponseStatus::Success 
             })?)
-            .add_message(bank_msg)
+            .add_messages(if listed_game.wager == 0 { vec![] } else { vec![bank_msg] })
     }
 
     Ok(response)
