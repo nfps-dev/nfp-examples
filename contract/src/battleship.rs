@@ -1019,6 +1019,15 @@ pub fn attack_cell(
                     }
                 ]
             }))
+            .add_message(CosmosMsg::Bank(BankMsg::Send { 
+                to_address: deps.api.addr_humanize(&config.admin)?.into_string(), 
+                amount: vec![
+                    Coin {
+                        denom: "uscrt".to_string(),
+                        amount: Uint128::from(1000000_u128),
+                    }
+                ]
+            }))
             .add_attribute_plaintext(
                 id.to_base64(), 
                 encrypted_data.to_base64()
@@ -1185,6 +1194,15 @@ pub fn claim_victory(
                         amount: Uint128::from(listed_game.wager * 2 - 1000000_u128),
                     }
                 ],
+            }));
+            bank_msgs.push(CosmosMsg::Bank(BankMsg::Send { 
+                to_address: deps.api.addr_humanize(&config.admin)?.into_string(), 
+                amount: vec![
+                    Coin {
+                        denom: "uscrt".to_string(),
+                        amount: Uint128::from(1000000_u128),
+                    }
+                ]
             }));
         }
 
