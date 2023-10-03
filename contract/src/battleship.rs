@@ -667,10 +667,32 @@ fn record_hit(
     cell: usize,
     ship_type: u8,
     ship_size: u8,
-) -> () {
+) -> StdResult<()> {
     away.away_values[cell] |= CellValue::Hit as u8;
-    away.carrier_hits += 1;
-    if away.carrier_hits == ship_size {
+    let hits = match CellValue::try_from(ship_type) {
+        Ok(CellValue::Carrier) => { 
+            away.carrier_hits += 1; 
+            away.carrier_hits
+        }
+        Ok(CellValue::Battleship) => {
+            away.battleship_hits += 1;
+            away.battleship_hits
+        }
+        Ok(CellValue::Cruiser) => {
+            away.cruiser_hits += 1;
+            away.cruiser_hits
+        }
+        Ok(CellValue::Submarine) => {
+            away.submarine_hits += 1;
+            away.submarine_hits
+        }
+        Ok(CellValue::Destroyer) => {
+            away.destroyer_hits += 1;
+            away.destroyer_hits
+        }
+        _ => { return Err(StdError::generic_err("Invalid ship type when recording hit")); }
+    };
+    if hits == ship_size {
         // the carrier has been sunk, reveal the type
         for (i, value) in home.iter().enumerate() {
             if *value & ship_type == ship_type {
@@ -679,6 +701,7 @@ fn record_hit(
         }
     }
     home[cell] |= CellValue::Hit as u8;
+    Ok(())
 }
 
 pub fn attack_cell(
