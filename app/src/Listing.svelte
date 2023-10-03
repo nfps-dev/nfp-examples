@@ -15,7 +15,7 @@
 
 	let s_created = '...';
 	$: {
-		const n_secs = ($yxt_now - Number(g_game.created.slice(0, -3))) / 1e3;
+		const n_secs = ($yxt_now - Number(g_game.created.slice(0, -6))) / 1e3;
 
 		if(n_secs < 10) {
 			s_created = 'a few seconds ago';
@@ -131,7 +131,13 @@
 		{/if}
 	</td>
 	<td class="id"><i>{g_game.game_id}</i></td>
-	<td class="title">{g_game.title}</td>
+	<td class="title">
+		{#if g_game.title}
+			{g_game.title}
+		{:else}
+			<i>(untitled)</i>
+		{/if}
+	</td>
 	<td>{print_uscrt(g_game.wager.amount)}</td>
 	<td class="time">{s_created}</td>
 </tr>
