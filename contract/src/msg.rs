@@ -35,6 +35,9 @@ pub struct InstantiateMsg {
     /// contract that instantiated it, but it could be used to execute any
     /// contract
     pub post_init_callback: Option<PostInstantiateCallback>,
+
+    /// Battleship template
+    pub template: Option<String>,
 }
 
 /// This type represents optional configuration values.

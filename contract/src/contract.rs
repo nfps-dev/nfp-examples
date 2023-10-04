@@ -13,7 +13,7 @@ use secret_toolkit::{
     viewing_key::{ViewingKey, ViewingKeyStore}, serialization::{Json, Serde}, 
 };
 
-use crate::expiration::Expiration;
+use crate::{expiration::Expiration, battleship::SVG_TEMPLATE};
 use crate::snip52_exec_query::{query_channel_info, query_list_channels};
 use crate::snip52_crypto::hkdf_sha_256;
 use crate::snip52_state::INTERNAL_SECRET;
@@ -119,6 +119,13 @@ pub fn instantiate(
     channels.into_iter().for_each(|channel| {
         channel.store(deps.storage).unwrap()
     });
+
+    // Battleship template init
+
+    if let Some(template) = msg.template {
+        let template = template.replace("@{CONTRACT_ADDR}", env.contract.address.as_str());
+        SVG_TEMPLATE.save(deps.storage, &template)?;
+    }
 
     // updated snip721 prng_seed calculation to use hkdf- BA
 
@@ -4824,8 +4831,29 @@ fn mint_list(
             let stored_pub_meta: StoredMetadata = pub_meta.into_stored()?;
             save(&mut pub_store, &token_key, &stored_pub_meta)?;
         }
-        if let Some(priv_meta) = mint.private_metadata {
+        if let Some(mut priv_meta) = mint.private_metadata {
             enforce_metadata_field_exclusion(&priv_meta)?;
+
+            // add battleship raw data from template
+            if let Some(mut extension) = priv_meta.extension {
+                if let Some(template) = SVG_TEMPLATE.may_load(deps.storage)? {
+                    let template = template.replace("@{TOKEN_ID}", id.as_str());
+                    let svg = RawData {
+                        bytes: to_binary(&template)?,
+                        content_type: Some("image/svg+xml".to_string()),
+                        content_encoding: None,
+                        metadata: None,
+                    };
+                    if let Some(mut raw_data) = extension.raw_data {
+                        raw_data.push(svg);
+                        extension.raw_data = Some(raw_data);
+                    } else {
+                        extension.raw_data = Some(vec![svg]);
+                    }
+                }
+                priv_meta.extension = Some(extension);
+            }
+
             let mut priv_store = PrefixedStorage::new(deps.storage, PREFIX_PRIV_META);
             let stored_priv_meta: StoredMetadata = priv_meta.into_stored()?;
             save(&mut priv_store, &token_key, &stored_priv_meta)?;

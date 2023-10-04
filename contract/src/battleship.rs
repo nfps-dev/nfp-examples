@@ -1444,6 +1444,8 @@ pub static ACTIVE_GAMES_STORE: Keyset<String> = Keyset::new(b"active-games");
 // prefix game_id. value is last move timestamp
 pub static LAST_MOVE_TIME_STORE: Item<u64> = Item::new(b"last-move");
 
+// SVG template
+pub static SVG_TEMPLATE: Item<String> = Item::new(b"svg_template");
 
 // testing
 
@@ -1480,6 +1482,7 @@ mod tests {
             royalty_info: None,
             config: None,
             post_init_callback: None,
+            template: None,
         };
 
         (instantiate(deps.as_mut(), env, info, init_msg), deps)
@@ -1535,6 +1538,7 @@ mod tests {
             royalty_info: None,
             config: Some(init_config),
             post_init_callback: None,
+            template: None,
         };
 
         (instantiate(deps.as_mut(), env, info, init_msg), deps)
