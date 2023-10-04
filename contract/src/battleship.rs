@@ -667,10 +667,32 @@ fn record_hit(
     cell: usize,
     ship_type: u8,
     ship_size: u8,
-) -> () {
+) -> StdResult<()> {
     away.away_values[cell] |= CellValue::Hit as u8;
-    away.carrier_hits += 1;
-    if away.carrier_hits == ship_size {
+    let hits = match CellValue::try_from(ship_type) {
+        Ok(CellValue::Carrier) => { 
+            away.carrier_hits += 1; 
+            away.carrier_hits
+        }
+        Ok(CellValue::Battleship) => {
+            away.battleship_hits += 1;
+            away.battleship_hits
+        }
+        Ok(CellValue::Cruiser) => {
+            away.cruiser_hits += 1;
+            away.cruiser_hits
+        }
+        Ok(CellValue::Submarine) => {
+            away.submarine_hits += 1;
+            away.submarine_hits
+        }
+        Ok(CellValue::Destroyer) => {
+            away.destroyer_hits += 1;
+            away.destroyer_hits
+        }
+        _ => { return Err(StdError::generic_err("Invalid ship type when recording hit")); }
+    };
+    if hits == ship_size {
         // the carrier has been sunk, reveal the type
         for (i, value) in home.iter().enumerate() {
             if *value & ship_type == ship_type {
@@ -679,6 +701,7 @@ fn record_hit(
         }
     }
     home[cell] |= CellValue::Hit as u8;
+    Ok(())
 }
 
 pub fn attack_cell(
@@ -754,7 +777,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Carrier as u8,
                             CARRIER_SIZE
-                        );
+                        )?;
                     } else if opponent_cell_value == CellValue::Battleship as u8 {
                         record_hit(
                             &mut initiator_away,
@@ -762,7 +785,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Battleship as u8,
                             BATTLESHIP_SIZE
-                        );
+                        )?;
                     } else if opponent_cell_value == CellValue::Cruiser as u8 {
                         record_hit(
                             &mut initiator_away,
@@ -770,7 +793,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Cruiser as u8,
                             CRUISER_SIZE
-                        );
+                        )?;
                     } else if opponent_cell_value == CellValue::Submarine as u8 {
                         record_hit(
                             &mut initiator_away,
@@ -778,7 +801,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Submarine as u8,
                             SUBMARINE_SIZE
-                        );  
+                        )?;  
                     } else if opponent_cell_value == CellValue::Destroyer as u8 {
                         record_hit(
                             &mut initiator_away,
@@ -786,7 +809,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Destroyer as u8,
                             DESTROYER_SIZE
-                        );  
+                        )?;  
                     } else {
                         return Err(StdError::generic_err("Invalid cell value"));
                     }
@@ -860,7 +883,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Carrier as u8,
                             CARRIER_SIZE
-                        );
+                        )?;
                     } else if opponent_cell_value == CellValue::Battleship as u8 {
                         record_hit(
                             &mut joiner_away,
@@ -868,7 +891,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Battleship as u8,
                             BATTLESHIP_SIZE
-                        );
+                        )?;
                     } else if opponent_cell_value == CellValue::Cruiser as u8 {
                         record_hit(
                             &mut joiner_away,
@@ -876,7 +899,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Cruiser as u8,
                             CRUISER_SIZE
-                        );
+                        )?;
                     } else if opponent_cell_value == CellValue::Submarine as u8 {
                         record_hit(
                             &mut joiner_away,
@@ -884,7 +907,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Submarine as u8,
                             SUBMARINE_SIZE
-                        );  
+                        )?;  
                     } else if opponent_cell_value == CellValue::Destroyer as u8 {
                         record_hit(
                             &mut joiner_away,
@@ -892,7 +915,7 @@ pub fn attack_cell(
                             cell,
                             CellValue::Destroyer as u8,
                             DESTROYER_SIZE
-                        );
+                        )?;
                     } else {
                         return Err(StdError::generic_err("Invalid cell value"));
                     }
@@ -989,14 +1012,21 @@ pub fn attack_cell(
             )?)        
             .add_message(CosmosMsg::Bank(BankMsg::Send {
                 to_address: sender.clone().into_string(),
-                amount: if listed_game.wager == 0 { vec![] } else {
-                    vec![
-                        Coin {
-                            denom: "uscrt".to_string(),
-                            amount: Uint128::from((listed_game.wager * 2) - 1000000_u128),
-                        }
-                    ]
-                },
+                amount: vec![
+                    Coin {
+                        denom: "uscrt".to_string(),
+                        amount: Uint128::from((listed_game.wager * 2) - 1000000_u128),
+                    }
+                ]
+            }))
+            .add_message(CosmosMsg::Bank(BankMsg::Send { 
+                to_address: deps.api.addr_humanize(&config.admin)?.into_string(), 
+                amount: vec![
+                    Coin {
+                        denom: "uscrt".to_string(),
+                        amount: Uint128::from(1000000_u128),
+                    }
+                ]
             }))
             .add_attribute_plaintext(
                 id.to_base64(), 
@@ -1078,7 +1108,7 @@ pub fn claim_victory(
         return Err(StdError::generic_err("Cannot claim victory this turn"));
     }
 
-    let bank_msg: CosmosMsg;
+    let mut bank_msgs: Vec<CosmosMsg> = vec![];
     let mut id: Option<Binary> = None;
     let mut encrypted_data: Option<Binary> = None;
     if initiator && turn == TurnState::WaitingForPlayer as u8 {
@@ -1096,15 +1126,17 @@ pub fn claim_victory(
         FINISHED_GAMES_STORE
             .insert(deps.storage, &game_id, &listed_game)?;
 
-        bank_msg = CosmosMsg::Bank(BankMsg::Send {
-            to_address: sender.clone().into_string(),
-            amount: vec![
-                Coin {
-                    denom: "uscrt".to_string(),
-                    amount: Uint128::from(listed_game.wager),
-                }
-            ],
-        });
+        if listed_game.wager > 0 {
+            bank_msgs.push(CosmosMsg::Bank(BankMsg::Send {
+                to_address: sender.clone().into_string(),
+                amount: vec![
+                    Coin {
+                        denom: "uscrt".to_string(),
+                        amount: Uint128::from(listed_game.wager),
+                    }
+                ],
+            }));
+        }
     } else {
         let time = env.block.time.seconds();
         let last_move_time = LAST_MOVE_TIME_STORE
@@ -1153,15 +1185,26 @@ pub fn claim_victory(
         FINISHED_GAMES_STORE
             .insert(deps.storage, &game_id, &listed_game)?;
 
-        bank_msg = CosmosMsg::Bank(BankMsg::Send {
-            to_address: sender.clone().into_string(),
-            amount: vec![
-                Coin {
-                    denom: "uscrt".to_string(),
-                    amount: Uint128::from(listed_game.wager * 2),
-                }
-            ],
-        });
+        if listed_game.wager > 0 {
+            bank_msgs.push(CosmosMsg::Bank(BankMsg::Send {
+                to_address: sender.clone().into_string(),
+                amount: vec![
+                    Coin {
+                        denom: "uscrt".to_string(),
+                        amount: Uint128::from(listed_game.wager * 2 - 1000000_u128),
+                    }
+                ],
+            }));
+            bank_msgs.push(CosmosMsg::Bank(BankMsg::Send { 
+                to_address: deps.api.addr_humanize(&config.admin)?.into_string(), 
+                amount: vec![
+                    Coin {
+                        denom: "uscrt".to_string(),
+                        amount: Uint128::from(1000000_u128),
+                    }
+                ]
+            }));
+        }
 
         // handle snip-52 channel data
         let channel = GAME_UPDATED_CHANNEL_ID.to_string();
@@ -1200,7 +1243,7 @@ pub fn claim_victory(
             .set_data(to_binary(&ExecuteAnswer::ClaimVictory { 
                 status: ResponseStatus::Success 
             })?)
-            .add_message(bank_msg)
+            .add_messages(bank_msgs)
             .add_attribute_plaintext(
                 id.unwrap().to_base64(), 
                 encrypted_data.unwrap().to_base64()
@@ -1210,7 +1253,7 @@ pub fn claim_victory(
             .set_data(to_binary(&ExecuteAnswer::ClaimVictory { 
                 status: ResponseStatus::Success 
             })?)
-            .add_message(bank_msg)
+            .add_messages(bank_msgs)
     }
 
     Ok(response)
@@ -1401,6 +1444,8 @@ pub static ACTIVE_GAMES_STORE: Keyset<String> = Keyset::new(b"active-games");
 // prefix game_id. value is last move timestamp
 pub static LAST_MOVE_TIME_STORE: Item<u64> = Item::new(b"last-move");
 
+// SVG template
+pub static SVG_TEMPLATE: Item<String> = Item::new(b"svg_template");
 
 // testing
 
@@ -1437,6 +1482,7 @@ mod tests {
             royalty_info: None,
             config: None,
             post_init_callback: None,
+            template: None,
         };
 
         (instantiate(deps.as_mut(), env, info, init_msg), deps)
@@ -1492,6 +1538,7 @@ mod tests {
             royalty_info: None,
             config: Some(init_config),
             post_init_callback: None,
+            template: None,
         };
 
         (instantiate(deps.as_mut(), env, info, init_msg), deps)
