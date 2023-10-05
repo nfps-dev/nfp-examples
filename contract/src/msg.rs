@@ -682,11 +682,6 @@ pub enum ExecuteAnswer {
         status: ResponseStatus,
     },
 
-    /// Public mint for battleship
-    MintPublic {
-        token_id: String,
-    },
-
     ///SNIP-52
     UpdateSeed {
         seed: Binary,
