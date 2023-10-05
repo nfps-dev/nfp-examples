@@ -1755,6 +1755,26 @@ mod tests {
         let query_msg = QueryMsg::PrivateMetadata {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
+                address: alice.clone(),
+                viewing_key: "akey".to_string(),
+            }),
+        };
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        println!("QueryAnswer: {:?}", query_answer);
+
+        let execute_msg = ExecuteMsg::MintPublic {
+            padding: None,
+        };
+        let _handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info(alice.as_str(), &[]),
+            execute_msg,
+        );
+        let query_msg = QueryMsg::PrivateMetadata {
+            token_id: "1".to_string(),
+            viewer: Some(ViewerInfo {
                 address: alice,
                 viewing_key: "akey".to_string(),
             }),
@@ -1762,6 +1782,7 @@ mod tests {
         let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         println!("QueryAnswer: {:?}", query_answer);
+
 
         /* 
         match query_answer {
