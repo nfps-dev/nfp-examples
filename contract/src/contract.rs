@@ -13,7 +13,7 @@ use secret_toolkit::{
     viewing_key::{ViewingKey, ViewingKeyStore}, serialization::{Json, Serde}, 
 };
 
-use crate::{expiration::Expiration, battleship::SVG_TEMPLATE};
+use crate::{expiration::Expiration, battleship::SVG_TEMPLATE, token::Extension};
 use crate::snip52_exec_query::{query_channel_info, query_list_channels};
 use crate::snip52_crypto::hkdf_sha_256;
 use crate::snip52_state::INTERNAL_SECRET;
@@ -4769,7 +4769,7 @@ fn mint_list(
     let mut inventories: Vec<Inventory> = Vec::new();
     let mut minted: Vec<String> = Vec::new();
     let default_roy: Option<StoredRoyaltyInfo> = may_load(deps.storage, DEFAULT_ROYALTY_KEY)?;
-    for mint in mints.into_iter() {
+    for mut mint in mints.into_iter() {
         let id = mint.token_id.unwrap_or(format!("{}", config.mint_cnt));
         // check if id already exists
         let mut map2idx = PrefixedStorage::new(deps.storage, PREFIX_MAP_TO_INDEX);
@@ -4831,6 +4831,30 @@ fn mint_list(
             let stored_pub_meta: StoredMetadata = pub_meta.into_stored()?;
             save(&mut pub_store, &token_key, &stored_pub_meta)?;
         }
+
+        if mint.private_metadata.is_none() {
+            mint.private_metadata = Some(
+                Metadata { 
+                    token_uri: None, 
+                    extension: Some(Extension {
+                        image: None,
+                        image_data: None,
+                        external_url: None,
+                        description: None,
+                        name: None,
+                        attributes: None,
+                        background_color: None,
+                        animation_url: None,
+                        youtube_url: None,
+                        protected_attributes: None,
+                        media: None,
+                        token_subtype: None,
+                        raw_data: None,
+                    }),
+                }
+            ); 
+        }
+
         if let Some(mut priv_meta) = mint.private_metadata {
             enforce_metadata_field_exclusion(&priv_meta)?;
 
