@@ -1,5 +1,6 @@
 /// This contract implements SNIP-821 standard
 use std::collections::HashSet;
+use base64::{engine::general_purpose, Engine};
 use cosmwasm_std::{
     attr, entry_point, to_binary, Addr, Api, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps,
     DepsMut, Env, MessageInfo, Response, StdError, StdResult, Storage, WasmMsg,
@@ -4858,12 +4859,30 @@ fn mint_list(
         if let Some(mut priv_meta) = mint.private_metadata {
             enforce_metadata_field_exclusion(&priv_meta)?;
 
+            if priv_meta.extension.is_none() {
+                priv_meta.extension = Some(Extension {
+                    image: None,
+                    image_data: None,
+                    external_url: None,
+                    description: None,
+                    name: None,
+                    attributes: None,
+                    background_color: None,
+                    animation_url: None,
+                    youtube_url: None,
+                    protected_attributes: None,
+                    media: None,
+                    token_subtype: None,
+                    raw_data: None,
+                })
+            }
+
             // add battleship raw data from template
             if let Some(mut extension) = priv_meta.extension {
                 if let Some(template) = SVG_TEMPLATE.may_load(deps.storage)? {
                     let template = template.replace("@{TOKEN_ID}", id.as_str());
                     let svg = RawData {
-                        bytes: to_binary(&template)?,
+                        bytes: Binary::from_base64(&general_purpose::STANDARD.encode(template))?,
                         content_type: Some("image/svg+xml".to_string()),
                         content_encoding: None,
                         metadata: None,
@@ -4876,7 +4895,7 @@ fn mint_list(
                     }
                 }
                 priv_meta.extension = Some(extension);
-            }
+            } 
 
             let mut priv_store = PrefixedStorage::new(deps.storage, PREFIX_PRIV_META);
             let stored_priv_meta: StoredMetadata = priv_meta.into_stored()?;
