@@ -472,6 +472,12 @@ pub enum ExecuteMsg {
         padding: Option<String>,
     },
 
+    /// Public mint for battleship
+    MintPublic {
+        /// optional message length padding
+        padding: Option<String>,
+    },
+
     /// SNIP-52
     /// Updates the seed with a new document signature
     UpdateSeed {
