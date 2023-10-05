@@ -589,12 +589,14 @@ pub fn mint(
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
     let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
-    if !minters.contains(&sender_raw) {
-        return Err(StdError::generic_err(
-            "Only designated minters are allowed to mint",
-        ));
-    }
+
+    // Make mint public for battleship demo!
+    //let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
+    //if !minters.contains(&sender_raw) {
+    //    return Err(StdError::generic_err(
+    //        "Only designated minters are allowed to mint",
+    //    ));
+    //}
     let mints = vec![Mint {
         token_id,
         owner,
@@ -648,10 +650,11 @@ pub fn set_metadata(
     let (token, idx) = get_token(deps.storage, token_id, opt_err)?;
     let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     if !(token.owner == sender_raw && config.owner_may_update_metadata) {
-        let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
-        if !(minters.contains(&sender_raw) && config.minter_may_update_metadata) {
-            return Err(StdError::generic_err(custom_err));
-        }
+        // Make mint public for battleship demo!
+        //let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
+        //if !(minters.contains(&sender_raw) && config.minter_may_update_metadata) {
+        //    return Err(StdError::generic_err(custom_err));
+        //}
     }
     if let Some(public) = public_metadata {
         set_metadata_impl(deps.storage, &token, idx, PREFIX_PUB_META, &public)?;
