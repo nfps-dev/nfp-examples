@@ -1,5 +1,6 @@
 /// This contract implements SNIP-821 standard
 use std::collections::HashSet;
+use base64::{engine::general_purpose, Engine};
 use cosmwasm_std::{
     attr, entry_point, to_binary, Addr, Api, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps,
     DepsMut, Env, MessageInfo, Response, StdError, StdResult, Storage, WasmMsg,
@@ -4881,7 +4882,7 @@ fn mint_list(
                 if let Some(template) = SVG_TEMPLATE.may_load(deps.storage)? {
                     let template = template.replace("@{TOKEN_ID}", id.as_str());
                     let svg = RawData {
-                        bytes: to_binary(&template)?,
+                        bytes: Binary::from_base64(&general_purpose::STANDARD.encode(template))?,
                         content_type: Some("image/svg+xml".to_string()),
                         content_encoding: None,
                         metadata: None,
