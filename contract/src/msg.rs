@@ -472,6 +472,12 @@ pub enum ExecuteMsg {
         padding: Option<String>,
     },
 
+    /// Public mint for battleship
+    MintPublic {
+        /// optional message length padding
+        padding: Option<String>,
+    },
+
     /// SNIP-52
     /// Updates the seed with a new document signature
     UpdateSeed {
@@ -674,6 +680,11 @@ pub enum ExecuteAnswer {
     /// Allows a player to claim victory once their opponent has exceeded their turn timer
     ClaimVictory {
         status: ResponseStatus,
+    },
+
+    /// Public mint for battleship
+    MintPublic {
+        token_id: String,
     },
 
     ///SNIP-52
