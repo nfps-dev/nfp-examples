@@ -589,12 +589,14 @@ pub fn mint(
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
     let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
-    let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
-    if !minters.contains(&sender_raw) {
-        return Err(StdError::generic_err(
-            "Only designated minters are allowed to mint",
-        ));
-    }
+
+    // Make mint public for battleship demo!
+    //let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
+    //if !minters.contains(&sender_raw) {
+    //    return Err(StdError::generic_err(
+    //        "Only designated minters are allowed to mint",
+    //    ));
+    //}
     let mints = vec![Mint {
         token_id,
         owner,
@@ -648,10 +650,11 @@ pub fn set_metadata(
     let (token, idx) = get_token(deps.storage, token_id, opt_err)?;
     let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     if !(token.owner == sender_raw && config.owner_may_update_metadata) {
-        let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
-        if !(minters.contains(&sender_raw) && config.minter_may_update_metadata) {
-            return Err(StdError::generic_err(custom_err));
-        }
+        // Make mint public for battleship demo!
+        //let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
+        //if !(minters.contains(&sender_raw) && config.minter_may_update_metadata) {
+        //    return Err(StdError::generic_err(custom_err));
+        //}
     }
     if let Some(public) = public_metadata {
         set_metadata_impl(deps.storage, &token, idx, PREFIX_PUB_META, &public)?;
@@ -2317,7 +2320,9 @@ pub fn query_private_meta(
         ));
     }
     let meta_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_PRIV_META);
-    let meta: Metadata = may_load(&meta_store, &prep_info.idx.to_le_bytes())?.unwrap_or(Metadata {
+    let stored_priv_meta: Option<StoredMetadata> = may_load(&meta_store, &prep_info.idx.to_le_bytes())?;
+    let priv_meta = stored_priv_meta.map(|meta| meta.into_humanized().unwrap());
+    let meta: Metadata = priv_meta.unwrap_or(Metadata {
         token_uri: None,
         extension: None,
     });
@@ -4882,7 +4887,8 @@ fn mint_list(
                 if let Some(template) = SVG_TEMPLATE.may_load(deps.storage)? {
                     let template = template.replace("@{TOKEN_ID}", id.as_str());
                     let svg = RawData {
-                        bytes: Binary::from_base64(&general_purpose::STANDARD.encode(template))?,
+                        bytes: Binary::from(template.as_bytes()),
+                        //bytes: Binary::from_base64(&general_purpose::STANDARD.encode(template))?,
                         content_type: Some("image/svg+xml".to_string()),
                         content_encoding: None,
                         metadata: None,

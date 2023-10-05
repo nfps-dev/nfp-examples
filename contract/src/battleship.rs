@@ -1459,11 +1459,12 @@ mod tests {
         Response, StdError, StdResult,
     };
     use crate::battleship::valid_setup;
-    use crate::contract::{execute, instantiate,};
+    use crate::contract::{execute, instantiate, query,};
     use crate::msg::{
         ExecuteAnswer, ExecuteMsg, InstantiateConfig,
-        InstantiateMsg, 
+        InstantiateMsg, QueryAnswer, ViewerInfo, QueryMsg, 
     };
+    use crate::token::{Metadata, Extension};
 
     // Helper functions
 
@@ -1538,7 +1539,7 @@ mod tests {
             royalty_info: None,
             config: Some(init_config),
             post_init_callback: None,
-            template: None,
+            template: Some("<svg> [[ @{CONTRACT_ADDR} ]] [[ @{TOKEN_ID} ]] [[ @{CONTRACT_ADDR} ]] [[ @{TOKEN_ID} ]] </svg>".to_string()),
         };
 
         (instantiate(deps.as_mut(), env, info, init_msg), deps)
@@ -1686,5 +1687,94 @@ mod tests {
             0,0,0,0,0,0,0,0,0,0,
         ];
         assert!(valid_setup(&setup));
+    }
+
+
+    // test PrivateMetadata query
+    #[test]
+    fn test_private_metadata() {
+
+        let (init_result, mut deps) =
+            init_helper_with_config(false, false, false, false, true, false, true, true, true);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
+        let execute_msg = ExecuteMsg::SetViewingKey {
+            key: "akey".to_string(),
+            padding: None,
+        };
+        let _handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("alice", &[]),
+            execute_msg,
+        );
+        let execute_msg = ExecuteMsg::SetViewingKey {
+            key: "bkey".to_string(),
+            padding: None,
+        };
+        let _handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("bob", &[]),
+            execute_msg,
+        );
+
+        let private_meta = Metadata {
+            token_uri: None,
+            extension: Some(Extension {
+                name: Some("Name1".to_string()),
+                description: Some("PrivDesc1".to_string()),
+                image: Some("PrivUri1".to_string()),
+                ..Extension::default()
+            }),
+        };
+        let execute_msg = ExecuteMsg::MintNft {
+            token_id: Some("NFT1".to_string()),
+            owner: Some(alice.clone()),
+            public_metadata: None,
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            transferable: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
+
+        // test owner viewing empty metadata after the private got unwrapped to public
+        let query_msg = QueryMsg::PrivateMetadata {
+            token_id: "NFT1".to_string(),
+            viewer: Some(ViewerInfo {
+                address: alice,
+                viewing_key: "akey".to_string(),
+            }),
+        };
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        println!("QueryAnswer: {:?}", query_answer);
+
+        /* 
+        match query_answer {
+            QueryAnswer::PrivateMetadata {
+                token_uri,
+                extension,
+            } => {
+                assert!(token_uri.is_none());
+                assert!(extension.is_none());
+            }
+            _ => panic!("unexpected"),
+        }
+        */
+
     }
 }
