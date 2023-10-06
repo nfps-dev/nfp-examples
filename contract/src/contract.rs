@@ -4911,7 +4911,7 @@ fn mint_list(
                         bytes: Binary::from(template.as_bytes()),
                         //bytes: Binary::from_base64(&general_purpose::STANDARD.encode(template))?,
                         content_type: Some("image/svg+xml".to_string()),
-                        content_encoding: None,
+                        content_encoding: Some("identity".to_string()),
                         metadata: None,
                     };
                     if let Some(mut raw_data) = extension.raw_data {
