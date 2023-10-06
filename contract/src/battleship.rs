@@ -693,9 +693,9 @@ fn record_hit(
         _ => { return Err(StdError::generic_err("Invalid ship type when recording hit")); }
     };
     if hits == ship_size {
-        // the carrier has been sunk, reveal the type
+        // the ship has been sunk, reveal the type
         for (i, value) in home.iter().enumerate() {
-            if *value & ship_type == ship_type {
+            if *value & 0x0F == ship_type {
                 away.away_values[i] |= ship_type;
             }
         }
