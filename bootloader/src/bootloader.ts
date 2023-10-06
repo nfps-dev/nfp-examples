@@ -12,9 +12,11 @@ import {
 	ls_write_json,
 	nfp_attr,
 	nfp_tags,
+	create_html,
 } from '@nfps.dev/runtime';
 
 import {
+	exec_contract,
 	query_contract_infer,
 } from '@solar-republic/neutrino';
 
@@ -54,6 +56,7 @@ else {
 				G_QUERY_PERMIT: a_info[2],
 				SH_VIEWING_KEY: a_info[3],
 				K_CONTRACT: a_info[4],
+				Z_AUTH: a_info[5],
 
 				// comc host
 				P_COMC_HOST: import.meta.env.WEB_COMCS?.split(',')[0] as HttpsUrl,
@@ -68,6 +71,17 @@ else {
 				localStorage.clear();
 				dm_button.textContent = 'Done. Reload to retry';
 			};
+
+			// await import('nfpx:public', {
+			// 	contract: k_contract,
+			// 	location: [si_chain, k_contract.addr],
+			// });
+
+			// dm_button.parentElement?.append(create_html('button', {
+			// 	onclick: 'mint',
+			// }, [
+			// 	`Don't have one yet? Mint your own`,
+			// ]));
 		}
 	};
 }

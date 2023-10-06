@@ -57,8 +57,10 @@ const sx_out = await build({
 		},
 		self: {
 			chain: si_chain,
-			contract: sa_contract,
-			token: si_token,
+			// contract: sa_contract,
+			// token: si_token,
+			contract: '@{CONTRACT_ADDR}',
+			token: '@{TOKEN_ID}',
 		},
 	},
 
@@ -82,9 +84,10 @@ const sx_out = await build({
 			create.html('a', {
 				href: `https://nfps.dev/sandbox?${new URLSearchParams({
 					chain: si_chain,
-					contract: sa_contract,
-					token: si_token,
-				})}`,
+					// contract: sa_contract,
+					// token: si_token,
+					contract: '@{CONTRACT_ADDR}',
+				})}${`&contract=@{CONTRACT_ADDR}&token=@{TOKEN_ID}`}`,
 			}, [
 				create.html('button', {}, body ?? ['Launch in browser']),
 			]),

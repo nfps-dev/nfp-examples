@@ -129,6 +129,8 @@
 								home: a_home,
 								turn: xc_turn,
 							};
+
+							c_updates++;
 						}
 					}
 
@@ -140,11 +142,12 @@
 				if(xc_turn < TurnState.GAME_OVER_INITIATOR_WON && g_game_active.role as number !== xc_turn % 2) return;
 
 				// reactive update assignment
-				g_game_active = {
-					...g_game_active,
+				oda(g_game_active, {
 					home: a_home,
 					turn: xc_turn,
-				};
+				});
+
+				c_updates++;
 			},
 		});
 
@@ -172,6 +175,8 @@
 	let y_neutrino: UiController;
 
 	let a_games_own: ListedGame[];
+
+	let c_updates = 1;
 
 	$: if(s_error) {
 		dm_error.showModal();
@@ -262,7 +267,7 @@
 	</dialog>
 
 	{#if g_game_active}
-		<Game g_game={g_game_active} {y_neutrino} />
+		<Game g_game={g_game_active} {c_updates} {y_neutrino} />
 	{:else}
 		<Lobby
 			bind:a_games_own={a_games_own}

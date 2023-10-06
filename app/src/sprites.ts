@@ -1,4 +1,4 @@
-import {index_to_crd, random} from 'app/src/graphics';
+import {index_to_crd, random} from './graphics';
 
 import SX_SPRITES from '../../media/explosion-sprites-lo.png';
 

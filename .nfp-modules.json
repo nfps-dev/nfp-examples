@@ -3,8 +3,8 @@
 	"comment": "Do not edit or delete this generated file! It should also be committed to version control.",
 	"modules": {
 		"bootloader": {
-			"version": "0.2",
-			"hash": "5d66fb5ccabb",
+			"version": "0.3",
+			"hash": "959f6d65f3eb",
 			"exports": {
 				".": {
 					"A_TOKEN_LOCATION": {
@@ -54,6 +54,10 @@
 					"P_COMC_HOST": {
 						"symbol": "n",
 						"dynamic": true
+					},
+					"Z_AUTH": {
+						"symbol": "o",
+						"dynamic": true
 					}
 				}
 			},
@@ -102,8 +106,8 @@
 			},
 			"dependencies": {
 				"bootloader": {
-					"version": "0.2",
-					"hash": "5d66fb5ccabb"
+					"version": "0.3",
+					"hash": "959f6d65f3eb"
 				}
 			}
 		},
