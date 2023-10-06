@@ -3332,6 +3332,7 @@ pub fn query_package_version(
         let unwrapped_package = package.as_ref().unwrap();
         if unwrapped_package.access != ACCESS_PUBLIC_STRING {
             let mut viewer = viewer;
+            let mut is_minter = false;
             if viewer.is_some() {
                 let unwrapped_viewer = viewer.clone().unwrap();
                 if unwrapped_viewer.address == "" { 
@@ -3356,40 +3357,44 @@ pub fn query_package_version(
                     });
                 }
                 ViewingKey::check(deps.storage, &viewer.as_ref().unwrap().address, &viewer.as_ref().unwrap().viewing_key)?;
+                let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
+                is_minter = minters.contains(&deps.api.addr_canonicalize(viewer.clone().unwrap().address.as_str())?);
             }
-        
-            // check if viewer has privileges to view token
-            let prep_info = query_token_prep(deps, token_id, viewer, from_permit)?;
-            let opt_viewer = prep_info.viewer_raw.as_ref();
-            if check_permission(
-                deps,
-                block,
-                &prep_info.token,
-                token_id,
-                opt_viewer,
-                PermissionType::ViewMetadata,
-                &mut Vec::new(),
-                &prep_info.err_msg,
-                prep_info.owner_is_public,
-            ).is_err() {
-                return Err(StdError::generic_err("type1 + ".to_owned() + no_permission_err));
-            }
-
-            // viewer can view token, now check if it is a cleared package
-            if unwrapped_package.access == ACCESS_CLEARED_STRING {
-                let key_value_store = ReadonlyPrefixedStorage::multilevel(
-                    deps.storage, 
-                    &[PREFIX_STORAGE_TOKEN, token_id.as_bytes()]
-                );
             
-                let may_value = may_load::<String>(&key_value_store, &KEY_CLEARED_PACKAGES.as_bytes()).unwrap_or(None);
-                if let Some(value) = may_value {
-                    let cleared_packages = Json::deserialize::<Vec<String>>(&value.as_bytes())?;
-                    if !cleared_packages.contains(&package_id) {
-                        return Err(StdError::generic_err("type2 + ".to_owned() + no_permission_err));
+            if !is_minter {
+                // check if viewer has privileges to view token
+                let prep_info = query_token_prep(deps, token_id, viewer, from_permit)?;
+                let opt_viewer = prep_info.viewer_raw.as_ref();
+                if check_permission(
+                    deps,
+                    block,
+                    &prep_info.token,
+                    token_id,
+                    opt_viewer,
+                    PermissionType::ViewMetadata,
+                    &mut Vec::new(),
+                    &prep_info.err_msg,
+                    prep_info.owner_is_public,
+                ).is_err() {
+                    return Err(StdError::generic_err("type1 + ".to_owned() + no_permission_err));
+                }
+
+                // viewer can view token, now check if it is a cleared package
+                if unwrapped_package.access == ACCESS_CLEARED_STRING {
+                    let key_value_store = ReadonlyPrefixedStorage::multilevel(
+                        deps.storage, 
+                        &[PREFIX_STORAGE_TOKEN, token_id.as_bytes()]
+                    );
+                
+                    let may_value = may_load::<String>(&key_value_store, &KEY_CLEARED_PACKAGES.as_bytes()).unwrap_or(None);
+                    if let Some(value) = may_value {
+                        let cleared_packages = Json::deserialize::<Vec<String>>(&value.as_bytes())?;
+                        if !cleared_packages.contains(&package_id) {
+                            return Err(StdError::generic_err("type2 + ".to_owned() + no_permission_err));
+                        }
+                    } else {
+                        return Err(StdError::generic_err("type3 + ".to_owned() + no_permission_err));
                     }
-                } else {
-                    return Err(StdError::generic_err("type3 + ".to_owned() + no_permission_err));
                 }
             }
         }
