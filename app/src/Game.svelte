@@ -35,7 +35,7 @@
 		// success
 		if(g_res) {
 			// update away grid and turn
-			a_away = g_res.away;
+			g_game.away = a_away = g_res.away;
 			xc_turn = g_res.turn;
 		}
 		// failure
@@ -87,6 +87,8 @@
 
 	export let y_neutrino: UiController;
 
+	export let c_updates: number;
+
 	let a_home: CellValue[] = Array(100).fill(0);
 	let a_away: CellValue[] = a_home.slice();
 
@@ -101,13 +103,13 @@
 	let f_retry: Nilable<() => void>;
 
 	// when game state updates
-	$: if(g_game.turn) {
+	$: if(c_updates && g_game.turn) {
 		// home is not all empty
 		b_game_on = g_game.home.some(F_IDENTITY);
 
 		// update cells
-		a_away = [...g_game.away];
-		a_home = [...g_game.home];
+		a_away = g_game.away;
+		a_home = g_game.home;
 
 		// update turn state
 		xc_turn = g_game.turn;
@@ -167,21 +169,28 @@
 		</div>
 	</div>
 
-	<div class="board" class:game-on={b_game_on}>
-		<Grid
-			{b_game_on}
-			{xc_turn}
-			{xc_role}
-			a_cells={a_away}
-			b_locked={b_lock_away}
-			on:attack={handle_attack}
-		/>
-		<Grid b_home
-			{b_game_on}
-			{xc_turn}
-			{xc_role}
-			a_cells={a_home}
-			on:submit={submit_setup}
-		/>
-	</div>
+
+	{#if [TurnState.GAME_OVER_INITIATOR_WON, TurnState.GAME_OVER_JOINER_WON].includes(xc_turn)}
+		<h1>
+			You {xc_role === xc_turn % 2? 'won!': 'lost.'}
+		</h1>
+	{:else}
+		<div class="board" class:game-on={b_game_on}>
+			<Grid
+				{b_game_on}
+				{xc_turn}
+				{xc_role}
+				a_cells={a_away}
+				b_locked={b_lock_away}
+				on:attack={handle_attack}
+			/>
+			<Grid b_home
+				{b_game_on}
+				{xc_turn}
+				{xc_role}
+				a_cells={a_home}
+				on:submit={submit_setup}
+			/>
+		</div>
+	{/if}
 </section>

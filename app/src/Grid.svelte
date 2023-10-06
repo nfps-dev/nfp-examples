@@ -7,14 +7,14 @@
 	
 	import {createEventDispatcher, onMount} from 'svelte';
 	
-	import {fade} from 'svelte/transition';
-	
 	import {random} from './graphics';
 	
 	import {CellValue, TurnState} from './interface/app';
 	
 	import {NL_SPRITES, draw_sprite} from './sprites';
-	import {A_VEHICLES, H_VEHICLE_NAMES, H_VEHICLE_WIDTHS, SX_VEHICLES, clip_dims, draw_vehicle, draw_x} from './vehicles';
+	import {A_VEHICLES, H_VEHICLE_NAMES, H_VEHICLE_WIDTHS, SX_VEHICLES, clip_dims, draw_destroyed, draw_vehicle, draw_x} from './vehicles';
+	
+	import Summary from './Summary.svelte';
 
 	const XL_CANVAS_DIM = 460;
 
@@ -76,8 +76,11 @@
 	let a_grid_prospective = a_cells.slice();
 	let b_intersects = false;
 
+	let h_destroyed: Record<number, 1> = {};
+
 	$: b_our_turn = xc_turn % 2 === xc_role as number;
 
+	$: b_player_turn = [TurnState.INITIATORS_TURN, TurnState.JOINERS_TURN].includes(xc_turn);
 
 
 	const shift_key_listener = (d_event: KeyboardEvent) => {
@@ -293,74 +296,113 @@
 		}
 	};
 
-	const update_display = () => {
-		const b_update = a_cells_drawn.some(F_IDENTITY);
 
-		const as_seen = new Set<number>();
+	const update_display = async() => {
+		// if the drawn state is totally blank, then this update is a patch
+		const b_patch = a_cells_drawn.some(F_IDENTITY);
 
-		// each cell in grid
-		for(let i_cell=0; i_cell<a_cells.length && as_seen.size < A_VEHICLES.length; i_cell++) {
-			const xc_drawn = a_cells_drawn[i_cell];
-			let xc_cell = a_cells[i_cell];
+		const h_seen: Record<number, number> = {};
 
-			// empty cell or no update
-			if(!xc_cell || xc_drawn === xc_cell) continue;
+		for(let i_cell=0; i_cell<a_cells.length; i_cell++) {
+			const xc_cell = a_cells[i_cell];
 
-			// cell was missed (both home and away)
-			if(xc_cell === CellValue.MISS) {
-				// state differs from what was drawn
-				if(b_update) {
-					void explode(i_cell);
-				}
-				else {
-					graphics_blast(i_cell);
-				}
-			}
-			// something unknown on away grid was hit
-			else if(xc_cell === CellValue.HIT) {
-				// state differs from what was drawn
-				if(b_update) {
-					void explode(i_cell);
-				}
-				else {
-					graphics_blast(i_cell);
-				}
+			// skip empty cells
+			if(!xc_cell) continue;
 
-				draw_x(d_2d2_vehicles, i_cell);
-			}
-			else {
-				// remove hit bitmask
-				const b_hit = xc_cell & CellValue.HIT;
-				xc_cell &= XM_WITHOUT_HIT;
-
-				// only if this is the start of the vehicle
-				if((a_cells[i_cell-1] & XM_WITHOUT_HIT) !== (xc_cell as number) && (a_cells[i_cell-10] & XM_WITHOUT_HIT) !== (xc_cell as number)) {
-					// horizontal or vertical
-					const b_rotated = (xc_cell as number) !== (a_cells[i_cell+1] & XM_WITHOUT_HIT);
-
-					// TODO: if vehicle is destroyed
-
-					draw_vehicle(d_2d2_vehicles, xc_cell, i_cell, b_rotated);
-				}
-
-				// a home vehicle was hit or an away vehicle was destroyed
-				if(b_hit) {
-					// state differs from what was drawn
-					if(b_update) {
+			// miss or hit unknown
+			if(CellValue.MISS === xc_cell || CellValue.HIT === xc_cell) {
+				// only draw if not already drawn
+				if(a_cells_drawn[i_cell] !== xc_cell) {
+					// patch update; animate explosion
+					if(b_patch) {
 						void explode(i_cell);
 					}
+					// otherwise, simply draw decal
 					else {
 						graphics_blast(i_cell);
 					}
 
-					draw_x(d_2d2_vehicles, i_cell);
+					// hit unknown; draw x
+					if(CellValue.HIT === xc_cell) {
+						draw_x(d_2d2_vehicles, i_cell);
+					}
+				}
+			}
+			// vehicle
+			else {
+				// which vehicle
+				const xc_vehicle_check = xc_cell & XM_WITHOUT_HIT;
+
+				// its size
+				const n_vehicle_size = H_VEHICLE_WIDTHS[xc_vehicle_check];
+
+				// skip not start of vehicle
+				if(h_seen[xc_vehicle_check]) continue;
+
+				// record vehicle seen
+				h_seen[xc_vehicle_check] = 1;
+
+				// whether vehicle is rotated
+				const b_rotated = xc_vehicle_check !== (a_cells[i_cell+1] & XM_WITHOUT_HIT);
+
+				// accumlate indexes to make drawing x'es easier
+				const a_xes: number[] = [];
+
+				// index of change
+				let i_change = -1;
+
+				// each cell along vehicle's path
+				for(let i_check=i_cell, c_cells=0; c_cells<n_vehicle_size; c_cells++, i_check+=b_rotated?10:1) {
+					// this marks a change
+					if(a_cells_drawn[i_check] !== a_cells[i_check]) i_change = i_check;
+
+					// found a cell where it was hit; save index
+					if(a_cells[i_check] & CellValue.HIT) a_xes.push(i_check);
+				}
+
+				// change detected
+				if(i_change > 0) {
+					// vehicle is destroyed
+					if(a_xes.length === n_vehicle_size) {
+						draw_destroyed(d_2d2_vehicles, xc_vehicle_check, i_cell, b_rotated);
+
+						// add to summary
+						h_destroyed[xc_vehicle_check] = 1;
+					}
+					// vehicle is not yet destroyed
+					else {
+						draw_vehicle(d_2d2_vehicles, xc_vehicle_check, i_cell, b_rotated);
+					}
+
+					// redraw xes
+					// eslint-disable-next-line @typescript-eslint/no-loop-func
+					a_xes.map(i => draw_x(d_2d2_vehicles, i));
+
+					// this was a live hit
+					if(b_patch) {
+						await explode(i_change);
+					}
 				}
 			}
 		}
 
 		// update drawn state
 		a_cells_drawn = [...a_cells];
+
+		// update summary
+		h_destroyed = {...h_destroyed};
 	};
+
+	// function check_destroyed(xc_vehicle: number, i_cell: number) {
+	// 	const a_xes: number[] = [];
+	// 	for(let i_check=i_cell, c_cells=0; c_cells<H_VEHICLE_WIDTHS[xc_vehicle]; c_cells++, i_check+=b_rotated?10:1) {
+	// 		if(!(a_cells[i_check] & CellValue.HIT)) {
+	// 			break DESTROYED;
+	// 		}
+
+	// 		a_xes.push(i_check);
+	// 	}
+	// }
 
 	onMount(() => {
 		const a_cols = [];
@@ -416,12 +458,12 @@
 		}
 	});
 
-	$: if(d_2d2_vehicles && a_cells.some(F_IDENTITY)) {
+	$: if(b_game_on && d_2d2_vehicles && a_cells.some(F_IDENTITY)) {
 		// reset all tds
 		qsa(dm_grid, 'td').map(dm => dm.className = '');
 
 		// update display
-		update_display();
+		void update_display();
 	}
 </script>
 
@@ -455,6 +497,12 @@
 		&:where(:not(.home)) {
 			transform: rotateX(-90deg) translate3d(0, 0px, -@xl_shift);
 		}
+
+		&.game-on:not(.home):not(.our-turn)>.grid {
+			filter: saturate(0.35) brightness(0.7);
+			transition-delay: 0.5s;
+			transition-duration: 1s;
+		}
 	}
 
 	.game-on {
@@ -479,7 +527,13 @@
 			linear-gradient(#ce8764 25%, #c67a58 25%, #c67a58 50%, #cc8460 50%, #cc8460 75%, #c78058 75%);
 		background-size: 160px 160px;
 		background-position: -10px -10px;
+
+		filter: none;
+		transition: filter 0.5s ease-in-out;
+		// let the animation against home play before distracting
+		transition-delay: 0.75s;
 	}
+
 
 	.overlay {
 		position: absolute;
@@ -496,7 +550,18 @@
 		>div {
 			margin: 6px 0;
 		}
+
+		h2 {
+			opacity: 0;
+			transition: opacity 1s linear;
+			transition-delay: 750ms;
+
+			&.showing {
+				opacity: 1;
+			}
+		}
 	}
+
 
 	dt,dd {
 		display: inline-block;
@@ -528,6 +593,8 @@
 <section
 	class:home={b_home}
 	class:game-on={b_game_on}
+	class:no-input={b_locked || (b_home? b_game_on: !b_our_turn)}
+	class:our-turn={b_our_turn}
 >
 	<div class="grid" bind:this={dm_grid} on:click={click_grid}>
 		<div class="overlay">
@@ -584,24 +651,32 @@
 				<!-- <div class="preview-img">
 					<img src={SX_VEHICLES} alt="" style:clip-path={sx_clip} style:object-position={sx_obj_pos} />
 				</div> -->
+			{:else}
+				<div>
+					<h2 class:showing={b_player_turn && !b_our_turn}>
+						Their turn
+					</h2>
+
+					<h3>
+						Vehicles destroyed
+					</h3>
+
+					<Summary {h_destroyed} />
+				</div>
 			{/if}
 		<!-- away grid -->
 		{:else}
-			<span>
-				<dt>Role</dt>
-				<dd>{xc_role}</dd>
+			<div>
+				<h2 class:showing={b_player_turn && b_our_turn}>
+					Your turn
+				</h2>
 
-				<dt>Turn</dt>
-				<dd>{xc_turn}</dd>
-			</span>
+				<h3>
+					Vehicles destroyed
+				</h3>
 
-			{#if [TurnState.INITIATORS_TURN, TurnState.JOINERS_TURN].includes(xc_turn)}
-				<div transition:fade>
-					<h3>
-						{b_our_turn? 'Your': 'Their'} turn
-					</h3>
-				</div>
-			{/if}
+				<Summary {h_destroyed} />
+			</div>
 		{/if}
 	</div>
 </section>

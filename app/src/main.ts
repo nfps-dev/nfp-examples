@@ -1,9 +1,9 @@
 import type {NfpxExports} from './env';
-import type {SecretAccAddr} from '@solar-republic/contractor';
+import type {QueryPermit, SecretAccAddr} from '@solar-republic/contractor';
 import type {AuthSecret_ViewerInfo, HttpsUrl} from '@solar-republic/neutrino';
 
 import {create_svg, create_html, ls_write, ls_write_b64, ls_read_b64} from '@nfps.dev/runtime';
-import {Wallet, gen_sk, exec_contract, SecretApp} from '@solar-republic/neutrino';
+import {Wallet, gen_sk, exec_contract, SecretApp, pubkey_to_bech32} from '@solar-republic/neutrino';
 
 // autoimport types so that svelte components can destructure
 import type {} from 'nfpx:app';
@@ -16,6 +16,7 @@ import {
 	P_LCD,
 	SH_VIEWING_KEY,
 	P_COMC_HOST,
+	Z_AUTH,
 	ls_read,
 	nfp_tags,
 	nfp_attr,
@@ -26,6 +27,8 @@ import SX_CSS_GLOBAL from './global.less?inline';
 
 // import root svelte component
 import App from './App.svelte';
+
+import type {Nilable} from '@blake.regalia/belt';
 
 // document element root
 const dm_root = document.documentElement;
@@ -71,11 +74,25 @@ dm_pause.onclick = () => {
 const d_params = new URLSearchParams(location.search);
 A_TOKEN_LOCATION[2] = d_params.get('token-id') || A_TOKEN_LOCATION[2];
 
+// create local storage key based on token location
 const si_storage_token_owner_addr = 'toa:'+A_TOKEN_LOCATION.join(':');
 
 // fetch token owner address
-const SA_OWNER = ls_read(si_storage_token_owner_addr) as SecretAccAddr
-	|| ls_write<SecretAccAddr>(si_storage_token_owner_addr, prompt('Please enter the account address that owns this token') || '');
+const SA_OWNER = d_params.get('owner')
+	|| ls_read(si_storage_token_owner_addr) as SecretAccAddr
+	|| ls_write<SecretAccAddr>(si_storage_token_owner_addr,
+		(Z_AUTH
+			? Array.isArray(Z_AUTH)
+				? Z_AUTH[1]
+				: 'object' === typeof Z_AUTH
+					// TODO: make pubkey_to_bech32 synchronous (needs sha256_sync)
+					// so that bech32 can be obtained from query permit
+					? null
+					// ? pubkey_to_bech32(base64_to_buffer((Z_AUTH as QueryPermit).signature.pub_key.value))
+					: null
+			: null)
+		|| prompt('Please enter the account address that owns this token') || ''
+	);
 
 // go async
 (async() => {
@@ -89,7 +106,7 @@ const SA_OWNER = ls_read(si_storage_token_owner_addr) as SecretAccAddr
 	ls_write_b64('sk', atu8_sk);
 	console.log(`Hot wallet address: ${k_wallet.addr}`);
 
-	const z_auth = G_QUERY_PERMIT || [SH_VIEWING_KEY, SA_OWNER] as AuthSecret_ViewerInfo;
+	const z_auth = G_QUERY_PERMIT || [(Z_AUTH as Nilable<AuthSecret_ViewerInfo>)?.[0] || SH_VIEWING_KEY, SA_OWNER] as AuthSecret_ViewerInfo;
 
 	// dynamic export before importing libs (which depend on these exports)
 	exportNfpx({

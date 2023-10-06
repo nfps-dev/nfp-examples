@@ -3,7 +3,7 @@
  * offline instead of forcing you, the developer, to perform an actual boot every time you reload.
  */
 import type {SecretAccAddr} from '@solar-republic/contractor';
-import type {HttpsUrl} from '@solar-republic/neutrino';
+import type {HttpsUrl, WeakSecretAccAddr} from '@solar-republic/neutrino';
 
 import {
 	create_svg,
@@ -42,6 +42,7 @@ export default function autoboot(): void {
 			SH_VIEWING_KEY: h_env.VIEWING_KEY!,
 			K_CONTRACT: await SecretContract(p_lcd, sa_contract),
 			P_COMC_HOST: p_comc,
+			Z_AUTH: [h_env.VIEWING_KEY!, h_env.OWNER as WeakSecretAccAddr],
 
 			// export the custom script loader
 			load_script,

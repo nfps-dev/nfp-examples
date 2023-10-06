@@ -1,7 +1,8 @@
 import {oda} from '@blake.regalia/belt';
 
-import {index_to_crd} from 'app/src/graphics';
+import {index_to_crd} from './graphics';
 
+import SX_DEBRIS from '../../media/debris.png';
 import SX_VEHICLES from '../../media/vehicles.png';
 
 export {SX_VEHICLES};
@@ -39,8 +40,8 @@ export const H_VEHICLE_NAMES: Record<number, string> = {
 const XL_SRC_ALIVE_W = 540;
 const XL_SRC_ALIVE_H = 480;
 
-const XL_SRC_DEAD_W = 540;
-const XL_SRC_DEAD_H = 480;
+const XL_SRC_DEAD_W = 405;
+const XL_SRC_DEAD_H = 360;
 
 const XL_DST_W = 5.4 * 40;  // 5 cols + 2/5ths
 const XL_DST_H = 4.8 * 40;  // 4 rows + 4/5ths
@@ -58,8 +59,11 @@ const H_COORDS: Record<number, [number, number, number, number, number, number]>
 	[XC_VEHICLE_SCOUT]: [0, 380/480, 220/540, XL_INNER_Y, XL_OFF_X, 0],
 };
 
-const dm_sheet = new Image(XL_SRC_ALIVE_W, XL_SRC_ALIVE_H);
-dm_sheet.src = SX_VEHICLES;
+const dm_alive = new Image(XL_SRC_ALIVE_W, XL_SRC_ALIVE_H);
+dm_alive.src = SX_VEHICLES;
+
+const dm_debris = new Image(XL_SRC_DEAD_W, XL_SRC_DEAD_H);
+dm_debris.src = SX_DEBRIS;
 
 // export const clip_path = (
 // 	xc_vehicle: number,
@@ -77,6 +81,40 @@ export const clip_dims = (
 	`${xl_src_h * XL_SRC_ALIVE_H}px`,
 	`-${xl_src_x * XL_SRC_ALIVE_W}px -${xl_src_y * XL_SRC_ALIVE_H}px`,
 ];
+
+// export const draw_body = (
+// 	d_2d: CanvasRenderingContext2D,
+// 	dm_sheet: HTMLImageElement,
+// 	xl_src_w: number,
+// 	xl_src_h: number,
+// 	xc_vehicle: number,
+// 	i_index: number,
+// 	b_rot: boolean
+// ) => {
+// 	const [xs_src_x, xs_src_y, xs_src_w, xs_src_h, xs_off_x, xs_off_y] = H_COORDS[xc_vehicle]!;
+
+// 	oda(d_2d, {
+// 		shadowOffsetX: -4,
+// 		shadowOffsetY: 8,
+// 		shadowBlur: 2,
+// 		shadowColor: '#6f4735',
+// 	});
+
+// 	const [xl_x, xl_y] = index_to_crd(i_index, 0.5);
+
+// 	d_2d.setTransform(1, 0, 0, 1, xl_x, xl_y);
+// 	if(b_rot) d_2d.rotate(Math.PI/2);
+
+// 	d_2d.drawImage(dm_sheet,
+// 		xs_src_x * xl_src_w, xs_src_y * xl_src_h,
+// 		xs_src_w * xl_src_w, xs_src_h * xl_src_h,
+// 		-20 - (xs_off_x * XL_DST_W), -20 - (xs_off_y * XL_DST_H),
+// 		xs_src_w * XL_DST_W, xs_src_h * XL_DST_H
+// 	);
+
+// 	d_2d.resetTransform();
+// };
+
 
 export const draw_vehicle = (
 	d_2d: CanvasRenderingContext2D,
@@ -98,10 +136,9 @@ export const draw_vehicle = (
 	d_2d.setTransform(1, 0, 0, 1, xl_x, xl_y);
 	if(b_rot) d_2d.rotate(Math.PI/2);
 
-	d_2d.drawImage(dm_sheet,
+	d_2d.drawImage(dm_alive,
 		xl_src_x * XL_SRC_ALIVE_W, xl_src_y * XL_SRC_ALIVE_H,
 		xl_src_w * XL_SRC_ALIVE_W, xl_src_h * XL_SRC_ALIVE_H,
-		// 30 + (i_x * 40 - (xl_off_x * XL_DST_W)), 30 + (i_y * 40 - (xl_off_y * XL_DST_H)),
 		-20 - (xl_off_x * XL_DST_W), -20 - (xl_off_y * XL_DST_H),
 		xl_src_w * XL_DST_W, xl_src_h * XL_DST_H
 	);
@@ -129,10 +166,9 @@ export const draw_destroyed = (
 	d_2d.setTransform(1, 0, 0, 1, xl_x, xl_y);
 	if(b_rot) d_2d.rotate(Math.PI/2);
 
-	d_2d.drawImage(dm_sheet,
+	d_2d.drawImage(dm_debris,
 		xl_src_x * XL_SRC_DEAD_W, xl_src_y * XL_SRC_DEAD_H,
 		xl_src_w * XL_SRC_DEAD_W, xl_src_h * XL_SRC_DEAD_H,
-		// 30 + (i_x * 40 - (xl_off_x * XL_DST_W)), 30 + (i_y * 40 - (xl_off_y * XL_DST_H)),
 		-20 - (xl_off_x * XL_DST_W), -20 - (xl_off_y * XL_DST_H),
 		xl_src_w * XL_DST_W, xl_src_h * XL_DST_H
 	);

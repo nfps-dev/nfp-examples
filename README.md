@@ -100,6 +100,8 @@ The root directory contains the `package.json` for managing the dependencies use
 
 7. Open the built SVG file in a web browser (`file://` protocol works!) or preview in no-script mode using other means.
 
+    > While developing, you may wish to add query parameters to localize the token ID and token owner, e.g., `?token-id=1&owner=secret1uvyw...`
+
 8. Configure a COMC host
 
     If operating offline, or `x.s2r.sh` is not available, run a local COMC host and update your `.env` file accordingly: e.g., `NFP_COMC_HOST="http://localhost:8080/"`. A COMC host is a page served from an HTTP(S) URL that is capable of communicating with Keplr/StarShell on behalf of the NFP when it is served from the `file://` protocol (Keplr only injects a content-script into HTTP(S) tabs).
