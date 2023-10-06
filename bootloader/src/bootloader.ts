@@ -1,5 +1,6 @@
 import type {NfpxExports} from './env';
 
+import type {AppInterface} from './interface/app';
 import type {BootInfo} from '@nfps.dev/runtime';
 import type {HttpsUrl} from '@solar-republic/neutrino';
 
@@ -12,11 +13,9 @@ import {
 	ls_write_json,
 	nfp_attr,
 	nfp_tags,
-	create_html,
 } from '@nfps.dev/runtime';
 
 import {
-	exec_contract,
 	query_contract_infer,
 } from '@solar-republic/neutrino';
 
@@ -51,16 +50,17 @@ else {
 			// save reusable globals
 			exportNfpx({
 				// boot info
-				A_TOKEN_LOCATION: a_info[0],
-				P_LCD: a_info[1],
-				G_QUERY_PERMIT: a_info[2],
-				SH_VIEWING_KEY: a_info[3],
-				K_CONTRACT: a_info[4],
-				Z_AUTH: a_info[5],
+				A_TOKEN_LOCATION: a_info[1],
+				P_LCD: a_info[2],
+				K_CONTRACT: a_info[3],
+				Z_AUTH: a_info[4],
 
-				// comc host
-				P_COMC_HOST: import.meta.env.WEB_COMCS?.split(',')[0] as HttpsUrl,
+				// comc hosts
+				A_COMCS: import.meta.env.WEB_COMCS!.split(',') as HttpsUrl[],
 			});
+
+			// inject scripts
+			a_info[0]();
 		}
 		// boot failed
 		else {

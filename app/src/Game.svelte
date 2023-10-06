@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type {PlayerRole, type ActiveGame, type CellValue, type ListedGame} from './interface/app';
+	import type {PlayerRole, ActiveGame, CellValue, ListedGame} from './interface/app';
 	import type {Nilable} from '@blake.regalia/belt';
 	import type {UiController} from '@nfps.dev/components/NeutrinoWallet';
 	

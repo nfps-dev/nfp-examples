@@ -3,8 +3,8 @@
 	"comment": "Do not edit or delete this generated file! It should also be committed to version control.",
 	"modules": {
 		"bootloader": {
-			"version": "0.3",
-			"hash": "959f6d65f3eb",
+			"version": "0.2",
+			"hash": "18c02bc8ff6c",
 			"exports": {
 				".": {
 					"A_TOKEN_LOCATION": {
@@ -15,15 +15,15 @@
 						"symbol": "b",
 						"dynamic": true
 					},
-					"G_QUERY_PERMIT": {
+					"K_CONTRACT": {
 						"symbol": "c",
 						"dynamic": true
 					},
-					"SH_VIEWING_KEY": {
+					"Z_AUTH": {
 						"symbol": "d",
 						"dynamic": true
 					},
-					"K_CONTRACT": {
+					"P_COMC_HOST": {
 						"symbol": "e",
 						"dynamic": true
 					},
@@ -51,12 +51,8 @@
 					"nfp_attr": {
 						"symbol": "m"
 					},
-					"P_COMC_HOST": {
+					"A_COMCS": {
 						"symbol": "n",
-						"dynamic": true
-					},
-					"Z_AUTH": {
-						"symbol": "o",
 						"dynamic": true
 					}
 				}
@@ -64,50 +60,46 @@
 			"dependencies": {}
 		},
 		"app": {
-			"version": "0.8",
-			"hash": "c26e8f76d40a",
+			"version": "0.1",
+			"hash": "4fae71a95da5",
 			"exports": {
 				".": {
-					"SA_OWNER": {
-						"symbol": "a"
-					},
-					"exec_contract": {
-						"symbol": "b"
-					},
 					"K_WALLET": {
-						"symbol": "c",
+						"symbol": "a",
 						"dynamic": true
-					},
-					"dm_root": {
-						"symbol": "d"
-					},
-					"dm_foreign": {
-						"symbol": "e"
-					},
-					"A_RPCS": {
-						"symbol": "f"
-					},
-					"P_COMC_HOST": {
-						"symbol": "g",
-						"dynamic": true
-					},
-					"A_COMCS": {
-						"symbol": "h"
 					},
 					"K_SERVICE": {
-						"symbol": "i",
+						"symbol": "b",
 						"dynamic": true
 					},
 					"Z_AUTH": {
-						"symbol": "j",
+						"symbol": "c",
 						"dynamic": true
+					},
+					"A_RPCS": {
+						"symbol": "d"
+					},
+					"A_COMCS": {
+						"symbol": "e"
+					},
+					"SA_OWNER": {
+						"symbol": "f"
+					},
+					"exec_contract": {
+						"symbol": "g"
+					},
+					"dm_root": {
+						"symbol": "h"
+					},
+					"dm_foreign": {
+						"symbol": "i"
 					}
 				}
 			},
 			"dependencies": {
 				"bootloader": {
-					"version": "0.3",
-					"hash": "959f6d65f3eb"
+					"version": "0.2",
+					"hash": "18c02bc8ff6c"
 				}
 			}
 		},

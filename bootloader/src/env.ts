@@ -5,17 +5,15 @@ import type {AppInterface} from './interface/app';
 import type {Nilable, Promisable} from '@blake.regalia/belt';
 import type {SlimTokenLocation, load_script} from '@nfps.dev/runtime';
 import type {QueryPermit} from '@solar-republic/contractor';
-import type {AuthSecret, HttpsUrl, SecretContract} from '@solar-republic/neutrino';
+import type {AuthSecret_ViewerInfo, HttpsUrl, SecretContract} from '@solar-republic/neutrino';
 
 // declare what the bootloader can export dynamically
 export interface NfpxExports {
 	A_TOKEN_LOCATION: SlimTokenLocation;
 	P_LCD: HttpsUrl;
 	K_CONTRACT: SecretContract<AppInterface>;
-	G_QUERY_PERMIT: Nilable<QueryPermit>;
-	SH_VIEWING_KEY: string;
-	P_COMC_HOST: HttpsUrl;
-	Z_AUTH: Nilable<AuthSecret>;
+	A_COMCS: HttpsUrl[];
+	Z_AUTH: Nilable<AuthSecret_ViewerInfo | QueryPermit>;
 
 	load_script?: typeof load_script;
 }

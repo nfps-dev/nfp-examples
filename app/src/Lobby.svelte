@@ -4,8 +4,7 @@
 	import type {UiController} from '@nfps.dev/components/NeutrinoWallet';
 	import type {Uint128} from '@solar-republic/contractor';
 	
-	import {subscribe_snip52_channels} from '@solar-republic/neutrino';
-	import {A_TOKEN_LOCATION, K_CONTRACT, SH_VIEWING_KEY} from 'nfpx:bootloader';
+	import {A_TOKEN_LOCATION} from 'nfpx:bootloader';
 	import {onMount} from 'svelte';
 	
 	import {XG_LIMIT_BASE} from './stores';
@@ -13,9 +12,7 @@
 	import Listing from './Listing.svelte';
 
 	const {
-		K_WALLET,
 		K_SERVICE,
-		SA_OWNER,
 		Z_AUTH,
 	} = destructureImportedNfpModule('app');
 

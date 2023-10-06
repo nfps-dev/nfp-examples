@@ -1,9 +1,11 @@
 import type {NfpxExports} from './env';
-import type {QueryPermit, SecretAccAddr} from '@solar-republic/contractor';
-import type {AuthSecret_ViewerInfo, HttpsUrl} from '@solar-republic/neutrino';
+import type {Nilable} from '@blake.regalia/belt';
+import type {SecretAccAddr} from '@solar-republic/contractor';
+import type {AuthSecret_ViewerInfo, HttpsUrl, WeakSecretAccAddr} from '@solar-republic/neutrino';
+import type {AppInterface} from 'app/src/interface/app';
 
 import {create_svg, create_html, ls_write, ls_write_b64, ls_read_b64} from '@nfps.dev/runtime';
-import {Wallet, gen_sk, exec_contract, SecretApp, pubkey_to_bech32} from '@solar-republic/neutrino';
+import {Wallet, gen_sk, exec_contract, SecretApp} from '@solar-republic/neutrino';
 
 // autoimport types so that svelte components can destructure
 import type {} from 'nfpx:app';
@@ -11,15 +13,13 @@ import type {} from 'nfpx:app';
 // reuse as much as possible from the bootloader to cut down on app's bundle size
 import {
 	A_TOKEN_LOCATION,
-	G_QUERY_PERMIT,
 	K_CONTRACT,
 	P_LCD,
-	SH_VIEWING_KEY,
-	P_COMC_HOST,
 	Z_AUTH,
 	ls_read,
 	nfp_tags,
 	nfp_attr,
+	A_COMCS,
 } from 'nfpx:bootloader';
 
 // import compiled global css
@@ -27,8 +27,6 @@ import SX_CSS_GLOBAL from './global.less?inline';
 
 // import root svelte component
 import App from './App.svelte';
-
-import type {Nilable} from '@blake.regalia/belt';
 
 // document element root
 const dm_root = document.documentElement;
@@ -39,7 +37,6 @@ dm_root.append(create_svg('style', {}, [SX_CSS_GLOBAL]));
 // read rpc data from nfp
 const dm_web = nfp_tags('web')?.[0];
 const A_RPCS = dm_web? nfp_attr(dm_web, 'rpcs')?.split(',') as HttpsUrl[]: [];
-const A_COMCS = ((dm_web? nfp_attr(dm_web, 'comcs')?.split(','): null) || [P_COMC_HOST]) as [HttpsUrl, ...HttpsUrl[]];
 
 // create ui to allow user to play/pause animations
 const dm_pause = create_html('button', {
@@ -94,6 +91,12 @@ const SA_OWNER = d_params.get('owner')
 		|| prompt('Please enter the account address that owns this token') || ''
 	);
 
+if(Array.isArray(Z_AUTH)) {
+	Z_AUTH[0] = d_params.get('vk') || Z_AUTH[0];
+	Z_AUTH[1] = (d_params.get('owner') || Z_AUTH[1]) as WeakSecretAccAddr;
+}
+
+
 // go async
 (async() => {
 	// get or create private key
@@ -106,13 +109,11 @@ const SA_OWNER = d_params.get('owner')
 	ls_write_b64('sk', atu8_sk);
 	console.log(`Hot wallet address: ${k_wallet.addr}`);
 
-	const z_auth = G_QUERY_PERMIT || [(Z_AUTH as Nilable<AuthSecret_ViewerInfo>)?.[0] || SH_VIEWING_KEY, SA_OWNER] as AuthSecret_ViewerInfo;
-
 	// dynamic export before importing libs (which depend on these exports)
 	exportNfpx({
 		K_WALLET: k_wallet,
 		K_SERVICE: SecretApp(k_wallet, K_CONTRACT, 0.125),
-		Z_AUTH: z_auth,
+		Z_AUTH: Z_AUTH!,
 	});
 
 	// launch the app

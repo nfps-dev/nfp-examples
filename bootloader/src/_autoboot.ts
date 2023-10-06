@@ -26,7 +26,6 @@ export default function autoboot(): void {
 	addEventListener('load', async() => {
 		const sa_contract = h_env.SELF_CONTRACT as SecretAccAddr;
 		const p_lcd = h_env.WEB_LCDS?.split(',')[0] as HttpsUrl;
-		const p_comc = h_env.WEB_COMCS?.split(',')[0] as HttpsUrl;
 
 		// override sdk's default script loader with a custom one to link to local package instead
 		const load_script = nfpx.l = si_package => Promise.resolve(create_svg('script', {
@@ -38,10 +37,8 @@ export default function autoboot(): void {
 			// boot info
 			A_TOKEN_LOCATION: [h_env.SELF_CHAIN!, sa_contract, h_env.SELF_TOKEN!],
 			P_LCD: p_lcd,
-			G_QUERY_PERMIT: null,
-			SH_VIEWING_KEY: h_env.VIEWING_KEY!,
 			K_CONTRACT: await SecretContract(p_lcd, sa_contract),
-			P_COMC_HOST: p_comc,
+			A_COMCS: h_env.WEB_COMCS!.split(',') as HttpsUrl[],
 			Z_AUTH: [h_env.VIEWING_KEY!, h_env.OWNER as WeakSecretAccAddr],
 
 			// export the custom script loader
