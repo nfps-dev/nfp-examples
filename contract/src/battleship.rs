@@ -1766,12 +1766,13 @@ mod tests {
         let execute_msg = ExecuteMsg::MintPublic {
             padding: None,
         };
-        let _handle_result = execute(
+        let handle_result = execute(
             deps.as_mut(),
             mock_env(),
             mock_info(alice.as_str(), &[]),
             execute_msg,
         );
+        println!("MintPublic result: {:?}", handle_result);
         let query_msg = QueryMsg::PrivateMetadata {
             token_id: "1".to_string(),
             viewer: Some(ViewerInfo {

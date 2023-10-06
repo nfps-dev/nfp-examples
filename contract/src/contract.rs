@@ -3372,7 +3372,7 @@ pub fn query_package_version(
                 &prep_info.err_msg,
                 prep_info.owner_is_public,
             ).is_err() {
-                return Err(StdError::generic_err(no_permission_err));
+                return Err(StdError::generic_err("type1 + ".to_owned() + no_permission_err));
             }
 
             // viewer can view token, now check if it is a cleared package
@@ -3386,15 +3386,15 @@ pub fn query_package_version(
                 if let Some(value) = may_value {
                     let cleared_packages = Json::deserialize::<Vec<String>>(&value.as_bytes())?;
                     if !cleared_packages.contains(&package_id) {
-                        return Err(StdError::generic_err(no_permission_err));
+                        return Err(StdError::generic_err("type2 + ".to_owned() + no_permission_err));
                     }
                 } else {
-                    return Err(StdError::generic_err(no_permission_err));
+                    return Err(StdError::generic_err("type3 + ".to_owned() + no_permission_err));
                 }
             }
         }
     } else {
-        return Err(StdError::generic_err(no_permission_err));
+        return Err(StdError::generic_err("type4 + ".to_owned() + no_permission_err));
     }
 
     to_binary(&QueryAnswer::PackageVersion { package })
