@@ -22,8 +22,8 @@ import {
 	A_COMCS,
 } from 'nfpx:bootloader';
 
-// import compiled global css
-import SX_CSS_GLOBAL from './global.less?inline';
+// import compiled app-wide css
+import SX_CSS_APP from './app.less?inline';
 
 // import root svelte component
 import App from './App.svelte';
@@ -31,8 +31,8 @@ import App from './App.svelte';
 // document element root
 const dm_root = document.documentElement;
 
-// add global css to document
-dm_root.append(create_svg('style', {}, [SX_CSS_GLOBAL]));
+// add app css to document
+dm_root.append(create_svg('style', {}, [SX_CSS_APP]));
 
 // read rpc data from nfp
 const dm_web = nfp_tags('web')?.[0];
@@ -59,6 +59,10 @@ const dm_foreign = create_svg('foreignObject', {
 ]);
 
 dm_root.append(dm_foreign);
+
+setTimeout(() => {
+	dm_app.classList.add('loaded');
+}, 250);
 
 dm_pause.onclick = () => {
 	dm_pause.textContent = dm_root.classList.toggle('paused')? 'Resume': 'Pause';

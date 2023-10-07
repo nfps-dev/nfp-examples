@@ -1,10 +1,11 @@
+/**
+ * This CSS gets appended to the document element, globally affecting all descendent elements.
+ * Apply rules cautiously.
+ */
+
 :root, dialog {
 	color: #f7f7f7;
 }
-
-// * {
-// 	color: #f7f7f7;
-// }
 
 input, button, select {
 	background: #333;
@@ -120,5 +121,25 @@ section.no-input td:not(.set):hover::after {
 	cursor: pointer;
 	&:hover {
 		text-decoration: underline;
+	}
+}
+
+#app {
+	width: 100vw;
+	height: 100vh;
+
+	transition: background 3s ease-in-out, backdrop-filter 3s ease-in-out;
+	background: #0000;
+	backdrop-filter: blur(0px);
+
+	&.loaded {
+		background: #0008;
+		backdrop-filter: blur(40px);
+	}
+}
+
+@supports not (backdrop-filter: 40px) {
+	#app.loaded {
+		background: #000c;
 	}
 }
