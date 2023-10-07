@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type {PlayerRole, ActiveGame, CellValue, ListedGame} from './interface/app';
 	import type {Nilable} from '@blake.regalia/belt';
 	import type {UiController} from '@nfps.dev/components/NeutrinoWallet';
 	
@@ -9,6 +8,8 @@
 	
 	import {A_TOKEN_LOCATION} from 'nfpx:bootloader';
 	import {slide} from 'svelte/transition';
+	
+	import {type PlayerRole, type ActiveGame, CellValue, type ListedGame} from './interface/app';
 	
 	import {TurnState} from './interface/app';
 	
@@ -22,12 +23,14 @@
 		b_lock_away = true;
 		y_neutrino.status(1);
 
+		const b_finishing_move = g_game.away.reduce((c, x) => c + (x & CellValue.HIT? 1: 0), 0) >= (2 + 3 + 3 + 4 + 5 - 1);
+
 		// submit move
 		const [g_res, xc_code, s_res] = await K_SERVICE.exec('attack_cell', {
 			token_id: A_TOKEN_LOCATION[2],
 			game_id: g_game.game_id,
 			cell: i_cell as Uint8,
-		}, XG_LIMIT_BASE);
+		}, XG_LIMIT_BASE + (b_finishing_move? 30_000n: 0n));
 
 		b_lock_away = false;
 		y_neutrino.status(0);
@@ -55,8 +58,6 @@
 
 		// set wallet ui status to busy
 		y_neutrino.status(1);
-
-		console.log(`Submitting setup: [${a_cells.join(',')}]`);
 
 		// execute contract
 		const [, xc_code, s_res] = await K_SERVICE.exec('submit_setup', {
@@ -169,12 +170,12 @@
 		</div>
 	</div>
 
-
+<!-- 
 	{#if [TurnState.GAME_OVER_INITIATOR_WON, TurnState.GAME_OVER_JOINER_WON].includes(xc_turn)}
 		<h1>
 			You {xc_role === xc_turn % 2? 'won!': 'lost.'}
 		</h1>
-	{:else}
+	{:else} -->
 		<div class="board" class:game-on={b_game_on}>
 			<Grid
 				{b_game_on}
@@ -192,5 +193,5 @@
 				on:submit={submit_setup}
 			/>
 		</div>
-	{/if}
+	<!-- {/if} -->
 </section>

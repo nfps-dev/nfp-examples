@@ -56,9 +56,6 @@ const dm_foreign = create_svg('foreignObject', {
 	y: '0',
 }, [
 	dm_app,
-	// create_html('div', {}, [
-	// 	dm_pause,
-	// ]),
 ]);
 
 dm_root.append(dm_foreign);
