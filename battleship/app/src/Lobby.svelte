@@ -1,7 +1,7 @@
 <script lang="ts">	
 	import type {ListedGame} from './interface/app';
 
-	import type {UiController} from '@nfps.dev/components/NeutrinoWallet';
+	import type {UiController} from '@nfps.dev/components/HotWallet';
 	import type {Uint128} from '@solar-republic/contractor';
 	
 	import {A_TOKEN_LOCATION} from 'nfpx:bootloader';

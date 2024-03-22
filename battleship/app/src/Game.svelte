@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type {Nilable} from '@blake.regalia/belt';
-	import type {UiController} from '@nfps.dev/components/NeutrinoWallet';
+	import type {UiController} from '@nfps.dev/components/HotWallet';
 	
 	import type {Uint8} from '@solar-republic/contractor';
 	

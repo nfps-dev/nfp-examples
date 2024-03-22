@@ -3,7 +3,7 @@
 	import type {SecretAccAddr, Uint128} from '@solar-republic/contractor';
 	
 	import {oda} from '@blake.regalia/belt';
-	import NeutrinoWallet, {type UiController} from '@nfps.dev/components/NeutrinoWallet';
+	import HotWallet, {type UiController} from '@nfps.dev/components/HotWallet';
 	import {subscribe_snip52_channels, type WeakSecretAccAddr} from '@solar-republic/neutrino';
 	
 	import {A_TOKEN_LOCATION, K_CONTRACT} from 'nfpx:bootloader';

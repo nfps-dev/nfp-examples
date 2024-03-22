@@ -1,0 +1,24 @@
+name: Deploy Contract
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Import deployment mnemonic
+      run: |
+        echo "${{ secrets.DEPLOYMENT_MNEMONIC }}" | secretcli keys add deployer --keyring-backend=file
+    
+    - name: Build contract
+      run: 
+    
+    - name: Deploy contract
+      uses: nfps-dev/deploy

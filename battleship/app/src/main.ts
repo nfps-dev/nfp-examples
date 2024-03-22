@@ -1,8 +1,6 @@
 import type {NfpxExports} from './env';
-import type {Nilable} from '@blake.regalia/belt';
 import type {SecretAccAddr} from '@solar-republic/contractor';
-import type {AuthSecret_ViewerInfo, HttpsUrl, WeakSecretAccAddr} from '@solar-republic/neutrino';
-import type {AppInterface} from 'app/src/interface/app';
+import type {HttpsUrl, WeakSecretAccAddr} from '@solar-republic/neutrino';
 
 import {create_svg, create_html, ls_write, ls_write_b64, ls_read_b64} from '@nfps.dev/runtime';
 import {Wallet, gen_sk, exec_contract, SecretApp} from '@solar-republic/neutrino';
